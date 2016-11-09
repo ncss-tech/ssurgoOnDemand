@@ -51,109 +51,94 @@ def geoRequest(aoi):
 
     try:
 
-        gQry = " --   Define a AOI in WGS84 \n"\
-        " ~DeclareGeometry(@aoi)~ \n"\
-        " select @aoi = geometry::STPolyFromText('polygon(( " + aoi + "))', 4326)\n"\
-        " \n"\
-        " --   Extract all intersected polygons \n"\
-        " ~DeclareIdGeomTable(@intersectedPolygonGeometries)~ \n"\
-        " ~GetClippedMapunits(@aoi,polygon,geo,@intersectedPolygonGeometries)~ \n"\
-        " \n"\
-        " \n"\
-        " --   Convert geometries to geographies so we can get areas \n"\
-        " ~DeclareIdGeogTable(@intersectedPolygonGeographies)~ \n"\
-        " ~GetGeogFromGeomWgs84(@intersectedPolygonGeometries,@intersectedPolygonGeographies)~ \n"\
-        " \n"\
-        " --   Return the polygonal geometries \n"\
-        " select * from @intersectedPolygonGeographies \n"\
-        " where geog.STGeometryType() = 'Polygon'\n"\
-        " \n"\
-
-        #uncomment next line to print geoquery
-        #arcpy.AddMessage(gQry)
-
-        # Send XML query to SDM Access service
-        sXML = """<?xml version="1.0" encoding="utf-8"?>
-        <soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
-        <soap12:Body>
-        <RunQuery xmlns="http://SDMDataAccess.nrcs.usda.gov/Tabular/SDMTabularService.asmx">
-          <Query>""" + gQry + """</Query>
-        </RunQuery>
-        </soap12:Body>
-        </soap12:Envelope>"""
-
-        dHeaders = dict()
-        dHeaders["Host"      ] = "sdmdataaccess.nrcs.usda.gov"
-        #dHeaders["User-Agent"] = "NuSOAP/0.7.3 (1.114)"
-        #dHeaders["Content-Type"] = "application/soap+xml; charset=utf-8"
-        dHeaders["Content-Type"] = "text/xml; charset=utf-8"
-        dHeaders["SOAPAction"] = "http://SDMDataAccess.nrcs.usda.gov/Tabular/SDMTabularService.asmx/RunQuery"
-        dHeaders["Content-Length"] = len(sXML)
-        sURL = "SDMDataAccess.nrcs.usda.gov"
-
-        startTime = time.time()
-
-        # Create SDM connection to service using HTTP
-        conn = httplib.HTTPConnection(sURL, 80)
-
-        # Send request in XML-Soap
-        conn.request("POST", "/Tabular/SDMTabularService.asmx", sXML, dHeaders)
-
-        # Get back XML response
-        response = conn.getresponse()
-
-        cStatus = response.status
-        cResponse = response.reason
-
-        #PrintMsg(str(cStatus) + ": " + cResponse)
-
-        xmlString = response.read()
-
-        # Close connection to SDM
-        conn.close()
-
-        #msg =  "Geometry Response time = {}\n".format((time.time() - startTime))[:-6]
-        if cStatus == 200:
-            msg = "AOI collected successfully"
-            arcpy.AddMessage(msg + '\n')
-        else:
-            msg = "Error collecting AOI: " + str(cStatus) + "=" + cResponse
-            return False, msg
-
-        # Convert XML to tree format
-        root = ET.fromstring(xmlString)
-
-        # Iterate through XML tree, finding required elements...
-
-
-        funcDict = dict()
-
-        #grab the records
-
         if descWsType == '':
             geoExt = '.shp'
         else:
             geoExt = ''
 
         sr = arcpy.SpatialReference(4326)
-        arcpy.management.CreateFeatureclass(outLoc, "SSURGO_express_polys" + geoExt, "POLYGON", None, None, None, sr)
-        arcpy.management.AddField(outLoc + os.sep + "SSURGO_express_polys" + geoExt, "mukey", "TEXT", None, None, "30")
+        arcpy.management.CreateFeatureclass(outLoc, "SSURGO_express_interpretations" + geoExt, "POLYGON", None, None, None, sr)
+        arcpy.management.AddField(outLoc + os.sep + "SSURGO_express_interpretations" + geoExt, "mukey", "TEXT", None, None, "30")
 
-        rows =  arcpy.da.InsertCursor(outLoc + os.sep + "SSURGO_express_polys" + geoExt, ["SHAPE@WKT", "mukey"])
+        gQry = """ --   Define a AOI in WGS84
+        ~DeclareGeometry(@aoi)~
+        select @aoi = geometry::STPolyFromText('polygon(( """ + aoi + """))', 4326)\n
 
-        keyList = list()
+        --   Extract all intersected polygons
+        ~DeclareIdGeomTable(@intersectedPolygonGeometries)~
+        ~GetClippedMapunits(@aoi,polygon,geo,@intersectedPolygonGeometries)~
 
-        for child in root.iter('Table'):
-            mukey = child.find('id').text
-            geog = child.find('geog').text
+        --   Convert geometries to geographies so we can get areas
+        ~DeclareIdGeogTable(@intersectedPolygonGeographies)~
+        ~GetGeogFromGeomWgs84(@intersectedPolygonGeometries,@intersectedPolygonGeographies)~
 
-            if not mukey in keyList:
-                keyList.append(mukey)
+        --   Return the polygonal geometries
+        select * from @intersectedPolygonGeographies
+        where geog.STGeometryType() = 'Polygon'"""
 
-            value = geog, mukey
-            rows.insertRow(value)
+        #uncomment next line to print geoquery
+        #arcpy.AddMessage(gQry)
 
-        return True, keyList
+        arcpy.AddMessage('Sending coordinates to Soil Data Access...\n')
+        theURL = "https://sdmdataaccess.nrcs.usda.gov"
+        url = theURL + "/Tabular/SDMTabularService/post.rest"
+
+        # Create request using JSON, return data as JSON
+        request = {}
+        request["FORMAT"] = "JSON"
+        request["QUERY"] = gQry
+
+        #json.dumps = serialize obj (request dictionary) to a JSON formatted str
+        data = json.dumps(request)
+
+        # Send request to SDA Tabular service using urllib2 library
+        # because we are passing the "data" argument, this is a POST request, not a GET
+        req = urllib2.Request(url, data)
+        response = urllib2.urlopen(req)
+
+        # read query results
+        qResults = response.read()
+
+        # Convert the returned JSON string into a Python dictionary.
+        qData = json.loads(qResults)
+
+        # get rid of objects
+        del qResults, response, req
+
+
+        funcDict = dict()
+
+        # if dictionary key "Table" is found
+        if "Table" in qData:
+
+
+            # get its value
+            resLst = qData["Table"]  # Data as a list of lists. All values come back as string
+
+
+
+            rows =  arcpy.da.InsertCursor(outLoc + os.sep + "SSURGO_express_interpretations" + geoExt, ["SHAPE@WKT", "mukey"])
+
+            keyList = list()
+
+            for e in resLst:
+
+                mukey = e[0]
+                geog = e[1]
+
+                if not mukey in keyList:
+                    keyList.append(mukey)
+
+                value = geog, mukey
+                rows.insertRow(value)
+
+            arcpy.AddMessage('\nReceived SSURGO polygons information successfully.\n')
+
+            return True, keyList
+
+        else:
+            Msg = 'Unable to translate feature set into valid geometry'
+            return False, Msg
 
     except socket.timeout as e:
         Msg = 'Soil Data Access timeout error'
@@ -161,6 +146,14 @@ def geoRequest(aoi):
 
     except socket.error as e:
         Msg = 'Socket error: ' + str(e)
+        return False, Msg
+
+    except HTTPError as e:
+        Msg = 'HTTP Error' + str(e)
+        return False, Msg
+
+    except URLError as e:
+        Msg = 'URL Error' + str(e)
         return False, Msg
 
     except:
@@ -182,10 +175,10 @@ def tabRequest(interp):
 
         if interp.find("{:}") <> -1:
             interp = interp.replace("{:}", ";")
-        elif interp.find("<") <> -1:
-            interp = interp.replace("<", '&lt;')
-        elif interp.find(">") <> -1:
-            interp = interp.replace(">", '&gt;')
+##        elif interp.find("<") <> -1:
+##            interp = interp.replace("<", '&lt;')
+##        elif interp.find(">") <> -1:
+##            interp = interp.replace(">", '&gt;')
 
         if aggMethod == "Dominant Component":
             #SDA Query
@@ -205,12 +198,6 @@ def tabRequest(interp):
                 INNER JOIN  component AS c ON c.mukey = mu.mukey  AND c.cokey = (SELECT TOP 1 c1.cokey FROM component AS c1
                 INNER JOIN mapunit ON c.mukey=mapunit.mukey AND c1.mukey=mu.mukey ORDER BY c1.comppct_r DESC, c1.cokey)"""
 
-
-##            "SELECT areasymbol, musym, muname, mu.mukey  AS MUKEY,(SELECT interphr FROM component INNER JOIN cointerp ON component.cokey = cointerp.cokey AND component.cokey = c.cokey AND ruledepth = 0 AND mrulename LIKE "+ interp +") as rating, (SELECT interphrc FROM component INNER JOIN cointerp ON component.cokey = cointerp.cokey AND component.cokey = c.cokey AND ruledepth = 0 AND mrulename LIKE "+interp+") as class\n"\
-##            " FROM legend  AS l\n"\
-##            " INNER JOIN  mapunit AS mu ON mu.lkey = l.lkey AND mu.mukey IN (" + keys + ")\n"\
-##            " INNER JOIN  component AS c ON c.mukey = mu.mukey  AND c.cokey = (SELECT TOP 1 c1.cokey FROM component AS c1\n"\
-##            " INNER JOIN mapunit ON c.mukey=mapunit.mukey AND c1.mukey=mu.mukey ORDER BY c1.comppct_r DESC, c1.cokey)\n"
         elif aggMethod == "Dominant Condition":
             iQry = """SELECT areasymbol, musym, muname, mu.mukey/1  AS MUKEY,
             (SELECT TOP 1 ROUND (AVG(interphr) over(partition by interphrc),2)
@@ -240,23 +227,7 @@ def tabRequest(interp):
             (SELECT TOP 1 c1.cokey FROM component AS c1
             INNER JOIN mapunit ON c.mukey=mapunit.mukey AND c1.mukey=mu.mukey ORDER BY c1.comppct_r DESC, c1.cokey)
             ORDER BY areasymbol, musym, muname, mu.mukey"""
-##            iQry = "SELECT areasymbol, musym, muname, mu.mukey/1  AS MUKEY,\n"\
-##            " (SELECT TOP 1 ROUND (AVG(interphr) over(partition by interphrc),2)\n"\
-##            " FROM mapunit\n"\
-##            " INNER JOIN component ON component.mukey=mapunit.mukey\n"\
-##            " INNER JOIN cointerp ON component.cokey = cointerp.cokey AND mapunit.mukey = mu.mukey AND ruledepth = 0 AND mrulename LIKE " +interp+ " GROUP BY interphrc, interphr\n"\
-##            " ORDER BY SUM (comppct_r) DESC)as rating,\n"\
-##            " (SELECT TOP 1 interphrc\n"\
-##            " FROM mapunit\n"\
-##            " INNER JOIN component ON component.mukey=mapunit.mukey\n"\
-##            " INNER JOIN cointerp ON component.cokey = cointerp.cokey AND mapunit.mukey = mu.mukey AND ruledepth = 0 AND mrulename LIKE " +interp+ "\n"\
-##            " GROUP BY interphrc, comppct_r ORDER BY SUM(comppct_r) over(partition by interphrc) DESC) as class\n"\
-##            " FROM legend  AS l\n"\
-##            " INNER JOIN  mapunit AS mu ON mu.lkey = l.lkey AND mu.mukey IN (" + keys + ")\n"\
-##            " INNER JOIN  component AS c ON c.mukey = mu.mukey AND c.cokey =\n"\
-##            " (SELECT TOP 1 c1.cokey FROM component AS c1\n"\
-##            " INNER JOIN mapunit ON c.mukey=mapunit.mukey AND c1.mukey=mu.mukey ORDER BY c1.comppct_r DESC, c1.cokey)\n"\
-##            " ORDER BY areasymbol, musym, muname, mu.mukey\n"
+##
         elif aggMethod == "Weighted Average":
             iQry = "SELECT\n"\
             " areasymbol, musym, muname, mu.mukey/1  AS MUKEY,\n"\
@@ -294,98 +265,73 @@ def tabRequest(interp):
             " \n"\
             " SELECT areasymbol, musym, muname, MUKEY, ISNULL (ROUND ((rating/sum_com),2), 99) AS rating,\n"\
             " CASE WHEN rating IS NULL THEN 'Not Rated'\n"\
-            " WHEN design = 'suitability' AND  ROUND ((rating/sum_com),2) &lt; = 0 THEN 'Not suited'\n"\
-            " WHEN design = 'suitability' AND  ROUND ((rating/sum_com),2)  &gt; 0.001 and  ROUND ((rating/sum_com),2)  &lt;=0.333 THEN 'Poorly suited'\n"\
-            " WHEN design = 'suitability' AND  ROUND ((rating/sum_com),2)  &gt; 0.334 and  ROUND ((rating/sum_com),2)  &lt;=0.666  THEN 'Moderately suited'\n"\
-            " WHEN design = 'suitability' AND  ROUND ((rating/sum_com),2)  &gt; 0.667 and  ROUND ((rating/sum_com),2)  &lt;=0.999  THEN 'Moderately well suited'\n"\
+            " WHEN design = 'suitability' AND  ROUND ((rating/sum_com),2) < = 0 THEN 'Not suited'\n"\
+            " WHEN design = 'suitability' AND  ROUND ((rating/sum_com),2)  > 0.001 and  ROUND ((rating/sum_com),2)  <=0.333 THEN 'Poorly suited'\n"\
+            " WHEN design = 'suitability' AND  ROUND ((rating/sum_com),2)  > 0.334 and  ROUND ((rating/sum_com),2)  <=0.666  THEN 'Moderately suited'\n"\
+            " WHEN design = 'suitability' AND  ROUND ((rating/sum_com),2)  > 0.667 and  ROUND ((rating/sum_com),2)  <=0.999  THEN 'Moderately well suited'\n"\
             " WHEN design = 'suitability' AND  ROUND ((rating/sum_com),2)   = 1  THEN 'Well suited'\n"\
             " \n"\
-            " WHEN design = 'limitation' AND  ROUND ((rating/sum_com),2) &lt; = 0 THEN 'Not limited '\n"\
-            " WHEN design = 'limitation' AND  ROUND ((rating/sum_com),2)  &gt; 0.001 and  ROUND ((rating/sum_com),2)  &lt;=0.333 THEN 'Slightly limited '\n"\
-            " WHEN design = 'limitation' AND  ROUND ((rating/sum_com),2)  &gt; 0.334 and  ROUND ((rating/sum_com),2)  &lt;=0.666  THEN 'Somewhat limited '\n"\
-            " WHEN design = 'limitation' AND  ROUND ((rating/sum_com),2)  &gt; 0.667 and  ROUND ((rating/sum_com),2)  &lt;=0.999  THEN 'Moderately limited '\n"\
+            " WHEN design = 'limitation' AND  ROUND ((rating/sum_com),2) < = 0 THEN 'Not limited '\n"\
+            " WHEN design = 'limitation' AND  ROUND ((rating/sum_com),2)  > 0.001 and  ROUND ((rating/sum_com),2)  <=0.333 THEN 'Slightly limited '\n"\
+            " WHEN design = 'limitation' AND  ROUND ((rating/sum_com),2)  > 0.334 and  ROUND ((rating/sum_com),2)  <=0.666  THEN 'Somewhat limited '\n"\
+            " WHEN design = 'limitation' AND  ROUND ((rating/sum_com),2)  > 0.667 and  ROUND ((rating/sum_com),2)  <=0.999  THEN 'Moderately limited '\n"\
             " WHEN design = 'limitation' AND  ROUND ((rating/sum_com),2)  = 1 THEN 'Very limited' END AS class, reason\n"\
             " FROM #main\n"\
             " DROP TABLE #main\n"
 
         # uncomment next line to print interp query to console
         #arcpy.AddMessage(iQry.replace("&gt;", ">").replace("&lt;", "<"))
+        #arcpy.AddMessage(iQry)
 
-        # Send XML query to SDM Access service
-        sXML = """<?xml version="1.0" encoding="utf-8"?>
-        <soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
-        <soap12:Body>
-        <RunQuery xmlns="http://SDMDataAccess.nrcs.usda.gov/Tabular/SDMTabularService.asmx">
-          <Query>""" + iQry + """</Query>
-        </RunQuery>
-        </soap12:Body>
-        </soap12:Envelope>"""
+        theURL = "https://sdmdataaccess.nrcs.usda.gov"
+        url = theURL + "/Tabular/SDMTabularService/post.rest"
 
-        dHeaders = dict()
-        dHeaders["Host"      ] = "sdmdataaccess.nrcs.usda.gov"
-        #dHeaders["User-Agent"] = "NuSOAP/0.7.3 (1.114)"
-        #dHeaders["Content-Type"] = "application/soap+xml; charset=utf-8"
-        dHeaders["Content-Type"] = "text/xml; charset=utf-8"
-        dHeaders["SOAPAction"] = "http://SDMDataAccess.nrcs.usda.gov/Tabular/SDMTabularService.asmx/RunQuery"
-        dHeaders["Content-Length"] = len(sXML)
-        sURL = "SDMDataAccess.nrcs.usda.gov"
+        # Create request using JSON, return data as JSON
+        request = {}
+        request["FORMAT"] = "JSON"
+        request["QUERY"] = iQry
 
-        startTime = time.time()
+        #json.dumps = serialize obj (request dictionary) to a JSON formatted str
+        data = json.dumps(request)
 
-        # Create SDM connection to service using HTTP
-        conn = httplib.HTTPConnection(sURL, 80)
+        # Send request to SDA Tabular service using urllib2 library
+        # because we are passing the "data" argument, this is a POST request, not a GET
+        req = urllib2.Request(url, data)
+        response = urllib2.urlopen(req)
 
-        # Send request in XML-Soap
-        conn.request("POST", "/Tabular/SDMTabularService.asmx", sXML, dHeaders)
+        # read query results
+        qResults = response.read()
 
-        # Get back XML response
-        response = conn.getresponse()
+        # Convert the returned JSON string into a Python dictionary.
+        qData = json.loads(qResults)
 
-        cStatus = response.status
-        cResponse = response.reason
+        # get rid of objects
+        del qResults, response, req
 
-        #PrintMsg(str(cStatus) + ": " + cResponse)
-
-        xmlString = response.read()
-
-        # Close connection to SDM
-        conn.close()
-
-        #msg =  "Collected {} data ({} seconds)".format(interp, (time.time() - startTime)[:-6])
-        msg = "Request for {} = {}".format(interp, cResponse)
-        arcpy.AddMessage(msg)
-        # Convert XML to tree format
 
         container = dict()
 
-        root = ET.fromstring(xmlString)
+        # if dictionary key "Table" is found
+        if "Table" in qData:
 
-        for child in root.iter('Table'):
+            # get its value
+            resLst = qData["Table"]  # Data as a list of lists. All values come back as string.
 
-            areasymbol = child.find('areasymbol').text
 
-            musym = child.find('musym').text
+        for e in resLst:
 
-            muname = child.find('muname').text
-
-            mukey = child.find('MUKEY').text
-
-            rating = child.find('rating').text
+            areasymbol = e[0]
+            musym = e[1]
+            muname = e[2]
+            mukey = e[3]
+            rating = e[4]
+            clss = e[5]
+            reason = e[6]
 
             try:
                 rating = float(rating)
-                #rating = round(float(rating), 3)
-
             except:
-                rating = -1
-
-            clss = child.find('class').text
-            if clss == None:
-                clss = ''
-
-            reason = child.find('reason').text
-            if reason == None:
-                reason = ''
+                rating = None
 
             try:
 
@@ -395,7 +341,10 @@ def tabRequest(interp):
             except:
                 reason = reason
 
-            container[mukey] = areasymbol,musym, muname, mukey, rating, clss, reason
+
+            #collect the results
+
+            container[mukey] = areasymbol, musym, muname, mukey, rating, clss, reason
 
 
         return True, container
@@ -409,6 +358,14 @@ def tabRequest(interp):
         Msg = 'Socket error: ' + str(e)
         return False, Msg
 
+    except HTTPError as e:
+        Msg = 'HTTP Error: ' + str(e)
+        return False, Msg
+
+    except URLError as e:
+        Msg = 'URL Error: ' + str(e)
+        return False, Msg
+
     except:
         errorMsg()
         Msg = 'Unknown error collecting interpreations for ' + interp
@@ -418,6 +375,8 @@ def tabRequest(interp):
 def mkTbl(sdaTab):
 
     import collections
+
+    arcpy.AddMessage("Building " + interp.replace("'", "") + ' interpretation table ')
 
     srtDict = collections.OrderedDict(sorted(sdaTab.items()))
 
@@ -443,7 +402,6 @@ def mkTbl(sdaTab):
 
     for entry in srtDict:
         row = srtDict.get(entry)
-        #arcpy.AddMessage(row)
         cursor.insertRow(row)
 
     del cursor, srtDict
@@ -461,8 +419,8 @@ def mkGeo():
         geoExt = ''
         tblExt = ''
 
-    inFeats = outLoc + os.sep + "SSURGO_express_polys" + geoExt
-    outFeats = outLoc + os.sep + "SSURGO_express_polys_" + name[19:] + geoExt
+    inFeats = outLoc + os.sep + "SSURGO_express_interpretations" + geoExt
+    outFeats = outLoc + os.sep + "SSURGO_express_interpretations_" + name[19:] + geoExt
 
     arcpy.management.CopyFeatures(inFeats, outFeats)
 
@@ -502,7 +460,6 @@ def mkGeo():
             values = list()
             with arcpy.da.SearchCursor(l, "rating") as rows:
                 for row in rows:
-                    #aVal = row[0]
                     aVal = round(row[0], 3)
 
                     if not aVal in values:
@@ -532,7 +489,7 @@ def mkLyr():
 
 
 
-    inFeats = outLoc + os.sep + "SSURGO_express_polys" + geoExt
+    inFeats = outLoc + os.sep + "SSURGO_express_interpretations" + geoExt
     featsLyr = arcpy.mapping.Layer(inFeats)
     if geoExt == '.shp':
         lyrLoc = outLoc
@@ -540,7 +497,7 @@ def mkLyr():
         lyrLoc = os.path.dirname(outLoc)
 
 
-    outLyr = lyrLoc + os.sep + "SSURGO_express_polys_" + name[19:] + ".lyr"
+    outLyr = lyrLoc + os.sep + "SSURGO_express_interpretations_" + name[19:] + ".lyr"
 
     arcpy.management.AddJoin(featsLyr, "mukey", path + os.sep + name + tblExt, "mukey", None)
 ##    arcpy.management.SaveToLayerFile(featsLyr, outLyr, None, None )
@@ -578,7 +535,10 @@ def mkLyr():
                 with arcpy.da.SearchCursor(l.name, valFld) as rows:
                     for row in rows:
                         #aVal = row[0]
-                        aVal = round(row[0], 3)
+                        try:
+                            aVal = round(row[0], 3)
+                        except:
+                            aVal = aVal
 
                         if not aVal in values:
                             values.append(aVal)
@@ -608,9 +568,9 @@ def mkLyr():
 #===============================================================================
 
 
-import sys, os, time, traceback, socket, urllib, httplib, collections, arcpy
-import xml.etree.cElementTree as ET
+import sys, os, time, traceback, socket, urllib2, collections, arcpy, json
 from HTMLParser import HTMLParser
+from urllib2 import HTTPError, URLError
 
 
 arcpy.env.overwriteOutput = True

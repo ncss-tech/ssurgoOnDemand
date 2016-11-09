@@ -69,6 +69,7 @@ def rslvProps(aProp):
 def getProps(aProp, areaSym, aggMethod, tDep, bDep, mmC):
 
     import socket
+    from urllib2 import URLError, HTTPError
 
     try:
 
@@ -97,18 +98,18 @@ def getProps(aProp, areaSym, aggMethod, tDep, bDep, mmC):
             " INTO #comp_temp3\n"\
             " FROM #comp_temp\n"\
             " SELECT\n"\
-            " areasymbol, musym, muname, mu.mukey/1  AS MUKEY, c.cokey AS COKEY, ch.chkey/1 AS CHKEY, compname, hzname, hzdept_r, hzdepb_r, CASE WHEN hzdept_r &lt;" + tDep + "  THEN " + tDep + " ELSE hzdept_r END AS hzdept_r_ADJ,\n"\
-            " CASE WHEN hzdepb_r &gt; " + bDep + "  THEN " + bDep + " ELSE hzdepb_r END AS hzdepb_r_ADJ,\n"\
-            " CAST (CASE WHEN hzdepb_r &gt; " +bDep + "  THEN " +bDep + " ELSE hzdepb_r END - CASE WHEN hzdept_r &lt;" + tDep + " THEN " + tDep + " ELSE hzdept_r END AS decimal (5,2)) AS thickness,\n"\
+            " areasymbol, musym, muname, mu.mukey/1  AS MUKEY, c.cokey AS COKEY, ch.chkey/1 AS CHKEY, compname, hzname, hzdept_r, hzdepb_r, CASE WHEN hzdept_r <" + tDep + "  THEN " + tDep + " ELSE hzdept_r END AS hzdept_r_ADJ,\n"\
+            " CASE WHEN hzdepb_r > " + bDep + "  THEN " + bDep + " ELSE hzdepb_r END AS hzdepb_r_ADJ,\n"\
+            " CAST (CASE WHEN hzdepb_r > " +bDep + "  THEN " +bDep + " ELSE hzdepb_r END - CASE WHEN hzdept_r <" + tDep + " THEN " + tDep + " ELSE hzdept_r END AS decimal (5,2)) AS thickness,\n"\
             " comppct_r,\n"\
-            " CAST (SUM (CASE WHEN hzdepb_r &gt; " + bDep + "  THEN " + bDep + " ELSE hzdepb_r END - CASE WHEN hzdept_r &lt;" + tDep + " THEN " + tDep + " ELSE hzdept_r END) over(partition by c.cokey) AS decimal (5,2)) AS sum_thickness,\n"\
+            " CAST (SUM (CASE WHEN hzdepb_r > " + bDep + "  THEN " + bDep + " ELSE hzdepb_r END - CASE WHEN hzdept_r <" + tDep + " THEN " + tDep + " ELSE hzdept_r END) over(partition by c.cokey) AS decimal (5,2)) AS sum_thickness,\n"\
             " CAST (ISNULL (" + aProp + ", 0) AS decimal (5,2))AS " + aProp +\
             " INTO #main"\
             " FROM legend  AS l\n"\
             " INNER JOIN  mapunit AS mu ON mu.lkey = l.lkey AND l.areasymbol LIKE '" + areaSym + "'\n"\
             " INNER JOIN  component AS c ON c.mukey = mu.mukey\n"\
             " INNER JOIN chorizon AS ch ON ch.cokey=c.cokey AND hzname NOT LIKE '%O%'AND hzname NOT LIKE '%r%'\n"\
-            " AND hzdepb_r &gt;" + tDep + " AND hzdept_r &lt;" + bDep + ""\
+            " AND hzdepb_r >" + tDep + " AND hzdept_r <" + bDep + ""\
             " INNER JOIN chtexturegrp AS cht ON ch.chkey=cht.chkey  WHERE cht.rvindicator = 'yes' AND  ch.hzdept_r IS NOT NULL\n"\
             " AND texture NOT LIKE '%PM%' and texture NOT LIKE '%DOM' and texture NOT LIKE '%MPT%' and texture NOT LIKE '%MUCK' and texture NOT LIKE '%PEAT%' and texture NOT LIKE '%br%' and texture NOT LIKE '%wb%'\n"\
             " ORDER BY areasymbol, musym, muname, mu.mukey, comppct_r DESC, cokey,  hzdept_r, hzdepb_r\n"\
@@ -141,7 +142,7 @@ def getProps(aProp, areaSym, aggMethod, tDep, bDep, mmC):
             propQry = "SELECT areasymbol, musym, muname, mu.mukey  AS mukey,\n"\
             " (SELECT TOP 1 " + mmC + " (chm1." + aProp + ") FROM  component AS cm1\n"\
             " INNER JOIN chorizon AS chm1 ON cm1.cokey = chm1.cokey AND cm1.cokey = c.cokey\n"\
-            " AND CASE WHEN chm1.hzname LIKE  '%O%' AND hzdept_r &lt;10 THEN 2\n"\
+            " AND CASE WHEN chm1.hzname LIKE  '%O%' AND hzdept_r <10 THEN 2\n"\
             " WHEN chm1.hzname LIKE  '%r%' THEN 2\n"\
             " WHEN chm1.hzname LIKE  '%'  THEN  1 ELSE 1 END = 1\n"\
             " ) AS " + aProp + "\n"+\
@@ -168,18 +169,18 @@ def getProps(aProp, areaSym, aggMethod, tDep, bDep, mmC):
             " ELSE CAST (CAST (comppct_r AS  decimal (5,2)) / CAST (SUM_COMP_PCT AS decimal (5,2)) AS decimal (5,2)) END AS WEIGHTED_COMP_PCT\n"\
             " INTO #comp_temp3\n"\
             " FROM #comp_temp\n"\
-            " SELECT areasymbol, musym, muname, mu.mukey/1  AS MUKEY, c.cokey AS COKEY, ch.chkey/1 AS CHKEY, compname, hzname, hzdept_r, hzdepb_r, CASE WHEN hzdept_r &lt; " + tDep + " THEN " + tDep + " ELSE hzdept_r END AS hzdept_r_ADJ,"\
-            " CASE WHEN hzdepb_r &gt; " + bDep + "  THEN " + bDep + " ELSE hzdepb_r END AS hzdepb_r_ADJ,\n"\
-            " CAST (CASE WHEN hzdepb_r &gt; " + bDep + "  THEN " + bDep + " ELSE hzdepb_r END - CASE WHEN hzdept_r &lt;" + tDep + " THEN " + tDep + " ELSE hzdept_r END AS decimal (5,2)) AS thickness,\n"\
+            " SELECT areasymbol, musym, muname, mu.mukey/1  AS MUKEY, c.cokey AS COKEY, ch.chkey/1 AS CHKEY, compname, hzname, hzdept_r, hzdepb_r, CASE WHEN hzdept_r < " + tDep + " THEN " + tDep + " ELSE hzdept_r END AS hzdept_r_ADJ,"\
+            " CASE WHEN hzdepb_r > " + bDep + "  THEN " + bDep + " ELSE hzdepb_r END AS hzdepb_r_ADJ,\n"\
+            " CAST (CASE WHEN hzdepb_r > " + bDep + "  THEN " + bDep + " ELSE hzdepb_r END - CASE WHEN hzdept_r <" + tDep + " THEN " + tDep + " ELSE hzdept_r END AS decimal (5,2)) AS thickness,\n"\
             " comppct_r,\n"\
-            " CAST (SUM (CASE WHEN hzdepb_r &gt; " + bDep + "  THEN " + bDep + " ELSE hzdepb_r END - CASE WHEN hzdept_r &lt;" + tDep + " THEN " + tDep + " ELSE hzdept_r END) over(partition by c.cokey) AS decimal (5,2)) AS sum_thickness,\n"\
+            " CAST (SUM (CASE WHEN hzdepb_r > " + bDep + "  THEN " + bDep + " ELSE hzdepb_r END - CASE WHEN hzdept_r <" + tDep + " THEN " + tDep + " ELSE hzdept_r END) over(partition by c.cokey) AS decimal (5,2)) AS sum_thickness,\n"\
             " CAST (ISNULL (" + aProp + " , 0) AS decimal (5,2))AS " + aProp + " \n"\
             " INTO #main\n"\
             " FROM legend  AS l\n"\
             " INNER JOIN  mapunit AS mu ON mu.lkey = l.lkey AND l.areasymbol LIKE '" + areaSym + "'\n"\
             " INNER JOIN  component AS c ON c.mukey = mu.mukey\n"\
             " INNER JOIN chorizon AS ch ON ch.cokey=c.cokey AND hzname NOT LIKE '%O%'AND hzname NOT LIKE '%r%'\n"\
-            " AND hzdepb_r &gt;" + tDep + " AND hzdept_r &lt;" + bDep + "\n"\
+            " AND hzdepb_r >" + tDep + " AND hzdept_r <" + bDep + "\n"\
             " INNER JOIN chtexturegrp AS cht ON ch.chkey=cht.chkey  WHERE cht.rvindicator = 'yes' AND  ch.hzdept_r IS NOT NULL\n"\
             " AND\n"\
             " texture NOT LIKE '%PM%' and texture NOT LIKE '%DOM' and texture NOT LIKE '%MPT%' and texture NOT LIKE '%MUCK' and texture NOT LIKE '%PEAT%' and texture NOT LIKE '%br%' and texture NOT LIKE '%wb%'\n"\
@@ -229,83 +230,77 @@ def getProps(aProp, areaSym, aggMethod, tDep, bDep, mmC):
 
         #PrintMsg(propQry.replace("&gt;", ">").replace("&lt;", "<"))
         #arcpy.AddMessage(' \n \n ')
-        # Send XML query to SDM Access service
-        sXML = """<?xml version="1.0" encoding="utf-8"?>
-        <soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
-        <soap12:Body>
-        <RunQuery xmlns="http://SDMDataAccess.nrcs.usda.gov/Tabular/SDMTabularService.asmx">
-          <Query>""" + propQry + """</Query>
-        </RunQuery>
-        </soap12:Body>
-        </soap12:Envelope>"""
-
-        dHeaders = dict()
-        dHeaders["Host"      ] = "sdmdataaccess.nrcs.usda.gov"
-        #dHeaders["User-Agent"] = "NuSOAP/0.7.3 (1.114)"
-        #dHeaders["Content-Type"] = "application/soap+xml; charset=utf-8"
-        dHeaders["Content-Type"] = "text/xml; charset=utf-8"
-        dHeaders["SOAPAction"] = "http://SDMDataAccess.nrcs.usda.gov/Tabular/SDMTabularService.asmx/RunQuery"
-        dHeaders["Content-Length"] = len(sXML)
-        sURL = "SDMDataAccess.nrcs.usda.gov"
-
-        # Create SDM connection to service using HTTP
-        conn = httplib.HTTPConnection(sURL, 80)
-
-        # Send request in XML-Soap
-        conn.request("POST", "/Tabular/SDMTabularService.asmx", sXML, dHeaders)
-
-        # Get back XML response
-        response = conn.getresponse()
-
-        cStatus = response.status
-        cResponse = response.reason
-
-        #PrintMsg(str(cStatus) + ": " + cResponse)
-
-        xmlString = response.read()
-
-        # Close connection to SDM
-        conn.close()
-
-        # Convert XML to tree format
-        tree = ET.fromstring(xmlString)
-
-        # Iterate through XML tree, finding required elements...
-        #areasymbol, musym, muname, mu.mukey, comppct_r
+        # send JSON POSTREST request to Soil Data Access
+        # and collect results into a dictionary
+        #arcpy.AddMessage("\nSending JSON request...")
 
         funcDict = dict()
 
-        #grab the records
-        for rec in tree.iter():
+        theURL = "https://sdmdataaccess.nrcs.usda.gov"
+        url = theURL + "/Tabular/SDMTabularService/post.rest"
 
-            if rec.tag =="areasymbol":
-                areasymbol = str(rec.text)
+        # Create request using JSON, return data as JSON
+        request = {}
+        request["FORMAT"] = "JSON"
+        request["QUERY"] = propQry
 
-            if rec.tag =="musym":
-                musym = str(rec.text)
+        #json.dumps = serialize obj (request dictionary) to a JSON formatted str
+        data = json.dumps(request)
 
-            if rec.tag =="muname":
-                muname = str(rec.text)
+        # Send request to SDA Tabular service using urllib2 library
+        # because we are passing the "data" argument, this is a POST request, not a GET
+        req = urllib2.Request(url, data)
+        response = urllib2.urlopen(req)
 
-            if rec.tag =="mukey":
-                mukey = str(rec.text)
+        # read query results
+        qResults = response.read()
 
-            if rec.tag == aProp:
+        # Convert the returned JSON string into a Python dictionary.
+        qData = json.loads(qResults)
+
+        # get rid of objects
+        del qResults, response, req
+
+        # Once data section (key='Table') is found in result...
+        valList = []
+
+        # if dictionary key "Table" is found
+        if "Table" in qData:
+            cResponse = 'OK'
+
+            # get its value
+            resLst = qData["Table"]  # Data as a list of lists. All values come back as string.
+
+
+            for e in resLst:
+                areasymbol = e[0]
+                musym = e[1]
+                muname = e[2]
+                mukey = e[3]
+                propBack = e[4]
 
                 try:
-                    propBack = float(rec.text)
+                    propback = float(propBack)
 
                 except:
-                    if str(rec.text):
-                        propBack = str(rec.text)
+                    #test to see if there is anything returned for the property
+                    if str(propBack):
+                        pass
+                    #if there isn't, set it to None
                     else:
                         propBack = None
 
-                #collect the results
                 funcDict[mukey] = mukey, int(mukey), areasymbol, musym, muname, propBack
 
 
+        # if dictionary key "Table" is NOT found
+        # No data returned for this query
+        else:
+          pass
+
         return True, funcDict, cResponse
+
+
 
 
 
@@ -317,6 +312,13 @@ def getProps(aProp, areaSym, aggMethod, tDep, bDep, mmC):
         Msg = 'Socket error: ' + str(e)
         return False, Msg, None
 
+    except HTTPError as e:
+        Msg = 'HTTP Error' + str(e)
+        return False, Msg, None
+
+    except URLError as e:
+        Msg = 'URL Error' + str(e)
+        return False, Msg, None
     except:
         errorMsg()
         Msg = 'Unknown error collecting interpreations for ' + eSSA
@@ -324,8 +326,8 @@ def getProps(aProp, areaSym, aggMethod, tDep, bDep, mmC):
 
 #===============================================================================
 
-import arcpy, sys, os, traceback, time, httplib
-import xml.etree.cElementTree as ET
+import arcpy, sys, os, traceback, time, urllib2, json
+#import xml.etree.cElementTree as ET
 
 arcpy.env.overwriteOutput = True
 
@@ -484,7 +486,7 @@ try:
                         cursor.insertRow(row)
                     else:
                         cursor.insertRow(row)
-                    cursor.insertRow(row)
+
 
                 del cursor
                 del compDict
