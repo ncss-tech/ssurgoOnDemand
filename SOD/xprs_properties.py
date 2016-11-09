@@ -66,99 +66,90 @@ def rslvProps(aProp):
 
 def geoRequest(aoi):
 
-    try:
+     try:
 
-        gQry = " --   Define AOI in WGS84 \n"\
-        " ~DeclareGeometry(@aoi)~ \n"\
-        " select @aoi = geometry::STPolyFromText('polygon(( " + aoi + "))', 4326)\n"\
-        " \n"\
-        " --   Extract all intersected polygons \n"\
-        " ~DeclareIdGeomTable(@intersectedPolygonGeometries)~ \n"\
-        " ~GetClippedMapunits(@aoi,polygon,geo,@intersectedPolygonGeometries)~ \n"\
-        " \n"\
-        " \n"\
-        " --   Convert geometries to geographies so we can get areas \n"\
-        " ~DeclareIdGeogTable(@intersectedPolygonGeographies)~ \n"\
-        " ~GetGeogFromGeomWgs84(@intersectedPolygonGeometries,@intersectedPolygonGeographies)~ \n"\
-        " \n"\
-        " --   Return the polygonal geometries \n"\
-        " select * from @intersectedPolygonGeographies \n"\
-        " where geog.STGeometryType() = 'Polygon'\n"\
-        " \n"\
+        if descWsType == '':
+            geoExt = '.shp'
+        else:
+            geoExt = ''
+
+        sr = arcpy.SpatialReference(4326)
+        arcpy.management.CreateFeatureclass(outLoc, "SSURGO_express_properties" + geoExt, "POLYGON", None, None, None, sr)
+        arcpy.management.AddField(outLoc + os.sep + "SSURGO_express_properties" + geoExt, "mukey", "TEXT", None, None, "30")
+
+        gQry = """ --   Define a AOI in WGS84
+        ~DeclareGeometry(@aoi)~
+        select @aoi = geometry::STPolyFromText('polygon(( """ + aoi + """))', 4326)\n
+
+        --   Extract all intersected polygons
+        ~DeclareIdGeomTable(@intersectedPolygonGeometries)~
+        ~GetClippedMapunits(@aoi,polygon,geo,@intersectedPolygonGeometries)~
+
+        --   Convert geometries to geographies so we can get areas
+        ~DeclareIdGeogTable(@intersectedPolygonGeographies)~
+        ~GetGeogFromGeomWgs84(@intersectedPolygonGeometries,@intersectedPolygonGeographies)~
+
+        --   Return the polygonal geometries
+        select * from @intersectedPolygonGeographies
+        where geog.STGeometryType() = 'Polygon'"""
 
         #uncomment next line to print geoquery
-        #arcpy.AddMessage(gQry + "\n\n")
+        #arcpy.AddMessage(gQry)
 
-        # Send XML query to SDM Access service
-        sXML = """<?xml version="1.0" encoding="utf-8"?>
-        <soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
-        <soap12:Body>
-        <RunQuery xmlns="http://SDMDataAccess.nrcs.usda.gov/Tabular/SDMTabularService.asmx">
-          <Query>""" + gQry + """</Query>
-        </RunQuery>
-        </soap12:Body>
-        </soap12:Envelope>"""
+        theURL = "https://sdmdataaccess.nrcs.usda.gov"
+        url = theURL + "/Tabular/SDMTabularService/post.rest"
 
-        dHeaders = dict()
-        dHeaders["Host"      ] = "sdmdataaccess.nrcs.usda.gov"
-        #dHeaders["User-Agent"] = "NuSOAP/0.7.3 (1.114)"
-        #dHeaders["Content-Type"] = "application/soap+xml; charset=utf-8"
-        dHeaders["Content-Type"] = "text/xml; charset=utf-8"
-        dHeaders["SOAPAction"] = "http://SDMDataAccess.nrcs.usda.gov/Tabular/SDMTabularService.asmx/RunQuery"
-        dHeaders["Content-Length"] = len(sXML)
-        sURL = "SDMDataAccess.nrcs.usda.gov"
+        arcpy.AddMessage('Sending coordinates to Soil Data Access...\n')
 
-        startTime = time.time()
+        # Create request using JSON, return data as JSON
+        request = {}
+        request["FORMAT"] = "JSON"
+        request["QUERY"] = gQry
 
-        # Create SDM connection to service using HTTP
-        conn = httplib.HTTPConnection(sURL, 80)
+        #json.dumps = serialize obj (request dictionary) to a JSON formatted str
+        data = json.dumps(request)
 
-        # Send request in XML-Soap
-        conn.request("POST", "/Tabular/SDMTabularService.asmx", sXML, dHeaders)
+        # Send request to SDA Tabular service using urllib2 library
+        # because we are passing the "data" argument, this is a POST request, not a GET
+        req = urllib2.Request(url, data)
+        response = urllib2.urlopen(req)
 
-        # Get back XML response
-        response = conn.getresponse()
+        # read query results
+        qResults = response.read()
 
-        cStatus = response.status
-        cResponse = response.reason
+        # Convert the returned JSON string into a Python dictionary.
+        qData = json.loads(qResults)
 
-        #PrintMsg(str(cStatus) + ": " + cResponse)
-
-        xmlString = response.read()
-
-        # Close connection to SDM
-        conn.close()
-
-        #msg =  "Geometry Response time = {}\n".format((time.time() - startTime))[:-6]
-        if cStatus == 200:
-            msg = "AOI collected successfully"
-            arcpy.AddMessage(msg + '\n')
-        else:
-            msg = "Error collecting AOI: " + str(cStatus) + "=" + cResponse
-            return False, msg
-
-        # Convert XML to tree format
-        root = ET.fromstring(xmlString)
-
-
-        # Iterate through XML tree, finding required elements...
+        # get rid of objects
+        del qResults, response, req
 
 
         funcDict = dict()
 
-        #grab the records
+        # if dictionary key "Table" is found
+        if "Table" in qData:
 
-        sr = arcpy.SpatialReference(4326)
-        arcpy.management.CreateFeatureclass(outLoc, "SSURGO_express_prop_polys" + geoExt, "POLYGON", None, None, None, sr)
-        arcpy.management.AddField(outLoc + os.sep + "SSURGO_express_prop_polys" + geoExt, "mukey", "TEXT", None, None, "30")
+            # get its value
+            resLst = qData["Table"]  # Data as a list of lists. All values come back as string.
 
-        rows =  arcpy.da.InsertCursor(outLoc + os.sep + "SSURGO_express_prop_polys" + geoExt, ["SHAPE@WKT", "mukey"])
+##        #msg =  "Geometry Response time = {}\n".format((time.time() - startTime))[:-6]
+##        if cStatus == 200:
+##            msg = "AOI collected successfully"
+##            arcpy.AddMessage(msg + '\n')
+##        else:
+##            msg = "Error collecting AOI: " + str(cStatus) + "=" + cResponse
+##            return False, msg
+
+
+
+        rows =  arcpy.da.InsertCursor(outLoc + os.sep + "SSURGO_express_properties" + geoExt, ["SHAPE@WKT", "mukey"])
 
         keyList = list()
 
-        for child in root.iter('Table'):
-            mukey = child.find('id').text
-            geog = child.find('geog').text
+        for e in resLst:
+
+            mukey = e[0]
+            geog = e[1]
 
             if not mukey in keyList:
                 keyList.append(mukey)
@@ -166,17 +157,27 @@ def geoRequest(aoi):
             value = geog, mukey
             rows.insertRow(value)
 
+        arcpy.AddMessage('\nReceived SSURGO polygon information successfully.\n')
+
         return True, keyList
 
-    except socket.timeout as e:
+     except socket.timeout as e:
         Msg = 'Soil Data Access timeout error'
         return False, Msg
 
-    except socket.error as e:
+     except socket.error as e:
         Msg = 'Socket error: ' + str(e)
         return False, Msg
 
-    except:
+     except HTTPError as e:
+        Msg = 'HTTP Error' + str(e)
+        return False, Msg
+
+     except URLError as e:
+        Msg = 'URL Error' + str(e)
+        return False, Msg
+
+     except:
         errorMsg()
         Msg = 'Unknown error collecting geometries'
         return False, Msg
@@ -187,6 +188,7 @@ def geoRequest(aoi):
 def tabRequest(aProp):
 
     #import socket
+    arcpy.AddMessage('Fetching data for ' + prop + '...')
 
     try:
 
@@ -215,18 +217,18 @@ def tabRequest(aProp):
             " INTO #comp_temp3\n"\
             " FROM #comp_temp\n"\
             " SELECT\n"\
-            " areasymbol, musym, muname, mu.mukey/1  AS MUKEY, c.cokey AS COKEY, ch.chkey/1 AS CHKEY, compname, hzname, hzdept_r, hzdepb_r, CASE WHEN hzdept_r &lt;" + tDep + "  THEN " + tDep + " ELSE hzdept_r END AS hzdept_r_ADJ,\n"\
-            " CASE WHEN hzdepb_r &gt; " + bDep + "  THEN " + bDep + " ELSE hzdepb_r END AS hzdepb_r_ADJ,\n"\
-            " CAST (CASE WHEN hzdepb_r &gt; " +bDep + "  THEN " +bDep + " ELSE hzdepb_r END - CASE WHEN hzdept_r &lt;" + tDep + " THEN " + tDep + " ELSE hzdept_r END AS decimal (5,2)) AS thickness,\n"\
+            " areasymbol, musym, muname, mu.mukey/1  AS MUKEY, c.cokey AS COKEY, ch.chkey/1 AS CHKEY, compname, hzname, hzdept_r, hzdepb_r, CASE WHEN hzdept_r <" + tDep + "  THEN " + tDep + " ELSE hzdept_r END AS hzdept_r_ADJ,\n"\
+            " CASE WHEN hzdepb_r > " + bDep + "  THEN " + bDep + " ELSE hzdepb_r END AS hzdepb_r_ADJ,\n"\
+            " CAST (CASE WHEN hzdepb_r > " +bDep + "  THEN " +bDep + " ELSE hzdepb_r END - CASE WHEN hzdept_r <" + tDep + " THEN " + tDep + " ELSE hzdept_r END AS decimal (5,2)) AS thickness,\n"\
             " comppct_r,\n"\
-            " CAST (SUM (CASE WHEN hzdepb_r &gt; " + bDep + "  THEN " + bDep + " ELSE hzdepb_r END - CASE WHEN hzdept_r &lt;" + tDep + " THEN " + tDep + " ELSE hzdept_r END) over(partition by c.cokey) AS decimal (5,2)) AS sum_thickness,\n"\
+            " CAST (SUM (CASE WHEN hzdepb_r > " + bDep + "  THEN " + bDep + " ELSE hzdepb_r END - CASE WHEN hzdept_r <" + tDep + " THEN " + tDep + " ELSE hzdept_r END) over(partition by c.cokey) AS decimal (5,2)) AS sum_thickness,\n"\
             " CAST (ISNULL (" + aProp + ", 0) AS decimal (5,2))AS " + aProp +\
             " INTO #main"\
             " FROM legend  AS l\n"\
             " INNER JOIN  mapunit AS mu ON mu.lkey = l.lkey AND mu.mukey IN (" + keys + ")\n"\
             " INNER JOIN  component AS c ON c.mukey = mu.mukey\n"\
             " INNER JOIN chorizon AS ch ON ch.cokey=c.cokey AND hzname NOT LIKE '%O%'AND hzname NOT LIKE '%r%'\n"\
-            " AND hzdepb_r &gt;" + tDep + " AND hzdept_r &lt;" + bDep + ""\
+            " AND hzdepb_r >" + tDep + " AND hzdept_r <" + bDep + ""\
             " INNER JOIN chtexturegrp AS cht ON ch.chkey=cht.chkey  WHERE cht.rvindicator = 'yes' AND  ch.hzdept_r IS NOT NULL\n"\
             " AND texture NOT LIKE '%PM%' and texture NOT LIKE '%DOM' and texture NOT LIKE '%MPT%' and texture NOT LIKE '%MUCK' and texture NOT LIKE '%PEAT%' and texture NOT LIKE '%br%' and texture NOT LIKE '%wb%'\n"\
             " ORDER BY areasymbol, musym, muname, mu.mukey, comppct_r DESC, cokey,  hzdept_r, hzdepb_r\n"\
@@ -259,7 +261,7 @@ def tabRequest(aProp):
             pQry = "SELECT areasymbol, musym, muname, mu.mukey  AS mukey,\n"\
             " (SELECT TOP 1 " + mmC + " (chm1." + aProp + ") FROM  component AS cm1\n"\
             " INNER JOIN chorizon AS chm1 ON cm1.cokey = chm1.cokey AND cm1.cokey = c.cokey\n"\
-            " AND CASE WHEN chm1.hzname LIKE  '%O%' AND hzdept_r &lt;10 THEN 2\n"\
+            " AND CASE WHEN chm1.hzname LIKE  '%O%' AND hzdept_r <10 THEN 2\n"\
             " WHEN chm1.hzname LIKE  '%r%' THEN 2\n"\
             " WHEN chm1.hzname LIKE  '%'  THEN  1 ELSE 1 END = 1\n"\
             " ) AS " + aProp + "\n"+\
@@ -286,18 +288,18 @@ def tabRequest(aProp):
             " ELSE CAST (CAST (comppct_r AS  decimal (5,2)) / CAST (SUM_COMP_PCT AS decimal (5,2)) AS decimal (5,2)) END AS WEIGHTED_COMP_PCT\n"\
             " INTO #comp_temp3\n"\
             " FROM #comp_temp\n"\
-            " SELECT areasymbol, musym, muname, mu.mukey/1  AS MUKEY, c.cokey AS COKEY, ch.chkey/1 AS CHKEY, compname, hzname, hzdept_r, hzdepb_r, CASE WHEN hzdept_r &lt; " + tDep + " THEN " + tDep + " ELSE hzdept_r END AS hzdept_r_ADJ,"\
-            " CASE WHEN hzdepb_r &gt; " + bDep + "  THEN " + bDep + " ELSE hzdepb_r END AS hzdepb_r_ADJ,\n"\
-            " CAST (CASE WHEN hzdepb_r &gt; " + bDep + "  THEN " + bDep + " ELSE hzdepb_r END - CASE WHEN hzdept_r &lt;" + tDep + " THEN " + tDep + " ELSE hzdept_r END AS decimal (5,2)) AS thickness,\n"\
+            " SELECT areasymbol, musym, muname, mu.mukey/1  AS MUKEY, c.cokey AS COKEY, ch.chkey/1 AS CHKEY, compname, hzname, hzdept_r, hzdepb_r, CASE WHEN hzdept_r < " + tDep + " THEN " + tDep + " ELSE hzdept_r END AS hzdept_r_ADJ,"\
+            " CASE WHEN hzdepb_r > " + bDep + "  THEN " + bDep + " ELSE hzdepb_r END AS hzdepb_r_ADJ,\n"\
+            " CAST (CASE WHEN hzdepb_r > " + bDep + "  THEN " + bDep + " ELSE hzdepb_r END - CASE WHEN hzdept_r <" + tDep + " THEN " + tDep + " ELSE hzdept_r END AS decimal (5,2)) AS thickness,\n"\
             " comppct_r,\n"\
-            " CAST (SUM (CASE WHEN hzdepb_r &gt; " + bDep + "  THEN " + bDep + " ELSE hzdepb_r END - CASE WHEN hzdept_r &lt;" + tDep + " THEN " + tDep + " ELSE hzdept_r END) over(partition by c.cokey) AS decimal (5,2)) AS sum_thickness,\n"\
+            " CAST (SUM (CASE WHEN hzdepb_r > " + bDep + "  THEN " + bDep + " ELSE hzdepb_r END - CASE WHEN hzdept_r <" + tDep + " THEN " + tDep + " ELSE hzdept_r END) over(partition by c.cokey) AS decimal (5,2)) AS sum_thickness,\n"\
             " CAST (ISNULL (" + aProp + " , 0) AS decimal (5,2))AS " + aProp + " \n"\
             " INTO #main\n"\
             " FROM legend  AS l\n"\
             " INNER JOIN  mapunit AS mu ON mu.lkey = l.lkey AND mu.mukey IN (" + keys + ")\n"\
             " INNER JOIN  component AS c ON c.mukey = mu.mukey\n"\
             " INNER JOIN chorizon AS ch ON ch.cokey=c.cokey AND hzname NOT LIKE '%O%'AND hzname NOT LIKE '%r%'\n"\
-            " AND hzdepb_r &gt;" + tDep + " AND hzdept_r &lt;" + bDep + "\n"\
+            " AND hzdepb_r >" + tDep + " AND hzdept_r <" + bDep + "\n"\
             " INNER JOIN chtexturegrp AS cht ON ch.chkey=cht.chkey  WHERE cht.rvindicator = 'yes' AND  ch.hzdept_r IS NOT NULL\n"\
             " AND\n"\
             " texture NOT LIKE '%PM%' and texture NOT LIKE '%DOM' and texture NOT LIKE '%MPT%' and texture NOT LIKE '%MUCK' and texture NOT LIKE '%PEAT%' and texture NOT LIKE '%br%' and texture NOT LIKE '%wb%'\n"\
@@ -346,77 +348,70 @@ def tabRequest(aProp):
         #uncomment next line to print interp query to console
         #arcpy.AddMessage(pQry.replace("&gt;", ">").replace("&lt;", "<"))
 
-        # Send XML query to SDM Access service
-        sXML = """<?xml version="1.0" encoding="utf-8"?>
-        <soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
-        <soap12:Body>
-        <RunQuery xmlns="http://SDMDataAccess.nrcs.usda.gov/Tabular/SDMTabularService.asmx">
-          <Query>""" + pQry + """</Query>
-        </RunQuery>
-        </soap12:Body>
-        </soap12:Envelope>"""
+        theURL = "https://sdmdataaccess.nrcs.usda.gov"
+        url = theURL + "/Tabular/SDMTabularService/post.rest"
 
-        dHeaders = dict()
-        dHeaders["Host"      ] = "sdmdataaccess.nrcs.usda.gov"
-        #dHeaders["User-Agent"] = "NuSOAP/0.7.3 (1.114)"
-        #dHeaders["Content-Type"] = "application/soap+xml; charset=utf-8"
-        dHeaders["Content-Type"] = "text/xml; charset=utf-8"
-        dHeaders["SOAPAction"] = "http://SDMDataAccess.nrcs.usda.gov/Tabular/SDMTabularService.asmx/RunQuery"
-        dHeaders["Content-Length"] = len(sXML)
-        sURL = "SDMDataAccess.nrcs.usda.gov"
+        # Create request using JSON, return data as JSON
+        request = {}
+        request["FORMAT"] = "JSON"
+        request["QUERY"] = pQry
 
-        startTime = time.time()
+        #json.dumps = serialize obj (request dictionary) to a JSON formatted str
+        data = json.dumps(request)
 
-        # Create SDM connection to service using HTTP
-        conn = httplib.HTTPConnection(sURL, 80)
+        # Send request to SDA Tabular service using urllib2 library
+        # because we are passing the "data" argument, this is a POST request, not a GET
+        req = urllib2.Request(url, data)
+        response = urllib2.urlopen(req)
 
-        # Send request in XML-Soap
-        conn.request("POST", "/Tabular/SDMTabularService.asmx", sXML, dHeaders)
+        # read query results
+        qResults = response.read()
 
-        # Get back XML response
-        response = conn.getresponse()
+        # Convert the returned JSON string into a Python dictionary.
+        qData = json.loads(qResults)
 
-        cStatus = response.status
-        cResponse = response.reason
-
-        #PrintMsg(str(cStatus) + ": " + cResponse)
-
-        xmlString = response.read()
-
-        # Close connection to SDM
-        conn.close()
-
-        #msg =  "Collected {} data ({} seconds)".format(interp, (time.time() - startTime)[:-6])
-        msg = "Request for {} = {}".format(aProp, cResponse)
-        arcpy.AddMessage(msg)
-        # Convert XML to tree format
+        # get rid of objects
+        del qResults, response, req
 
         container = dict()
 
-        root = ET.fromstring(xmlString)
 
-        for child in root.iter('Table'):
+        # if dictionary key "Table" is found
+        if "Table" in qData:
 
-            areasymbol = child.find('areasymbol').text
+            # get its value
+            resLst = qData["Table"]  # Data as a list of lists. All values come back as string.
 
-            musym = child.find('musym').text
+##        #msg =  "Geometry Response time = {}\n".format((time.time() - startTime))[:-6]
+##        if cStatus == 200:
+##            msg = "AOI collected successfully"
+##            arcpy.AddMessage(msg + '\n')
+##        else:
+##            msg = "Error collecting AOI: " + str(cStatus) + "=" + cResponse
+##            return False, msg
 
-            muname = child.find('muname').text
+            for e in resLst:
 
-            mukey = child.find('mukey').text
+                areasymbol = e[0]
+                musym = e[1]
+                muname = e[2]
+                mukey = e[3]
+                theProp = e[4]
 
-            theProp = child.find(aProp).text
-
-            try:
-                rating = float(theProp)
-            except:
-                if str(theProp):
-                    rating = theProp
+                try:
+                    rating = float(theProp)
+                except:
+                    if str(theProp):
+                        rating = theProp
                 else:
-                    rating = None
+                    rating = theProp
+##        #msg =  "Collected {} data ({} seconds)".format(interp, (time.time() - startTime)[:-6])
+##        msg = "Request for {} = {}".format(aProp, cResponse)
+##        arcpy.AddMessage(msg)
+##        # Convert XML to tree format
 
 
-            container[mukey] = areasymbol,musym, muname, mukey, rating
+                container[mukey] = areasymbol,musym, muname, mukey, rating
 
 ##        for k,v in container.iteritems():
 ##            arcpy.AddMessage(v)
@@ -432,10 +427,19 @@ def tabRequest(aProp):
         Msg = 'Socket error: ' + str(e)
         return False, Msg
 
+    except HTTPError as e:
+        Msg = 'HTTP Error' + str(e)
+        return False, Msg
+
+    except URLError as e:
+        Msg = 'URL Error' + str(e)
+        return False, Msg
+
     except:
         errorMsg()
-        Msg = 'Unknown error collecting interpreations for ' + aProp
+        Msg = 'Unknown error collecting geometries'
         return False, Msg
+
 
 def soloTbl(sdaTab):
 
@@ -597,8 +601,6 @@ def mkTbl(sdaTab):
             row = srtDict.get(entry)
             cursor.insertRow(row)
 
-            #cursor.insertRow(row)
-
         del cursor, row, srtDict
 
 
@@ -608,7 +610,7 @@ def mkGeo():
 
     #arcpy.env.addOutputsToMap = True
 
-    inFeats = outLoc + os.sep + "SSURGO_express_prop_polys" + geoExt
+    inFeats = outLoc + os.sep + "SSURGO_express_properties" + geoExt
     #outFeats = outLoc + os.sep + "SSURGO_express_prop_polys_" + name[19:] + geoExt
 
     arcpy.management.CopyFeatures(inFeats, outFeats)
@@ -626,7 +628,7 @@ def sym(inLyr):
         lyrLoc = os.path.dirname(outLoc)
 
 
-    outLyr = lyrLoc + os.sep + "SSURGO_express_polys_" + name[19:] + ".lyr"
+    outLyr = lyrLoc + os.sep + "SSURGO_express_properties_" + name[19:] + ".lyr"
 
     lyr = arcpy.mapping.Layer(inLyr)
 
@@ -708,10 +710,8 @@ def sym(inLyr):
 #===============================================================================
 
 
-import sys, os, time, traceback, socket
-import sys, os, urllib, httplib, collections
-import xml.etree.cElementTree as ET
-import arcpy
+import sys, os, time, urllib2, json, traceback, socket, arcpy
+from urllib2 import HTTPError, URLError
 
 arcpy.env.overwriteOutput = True
 arcpy.AddMessage('\n\n')
@@ -823,7 +823,7 @@ if geoResponse:
 
         if sdaResponse:
 
-            outFeats = os.path.join(outLoc, "SSURGO_express_prop_polys" + geoExt)
+            outFeats = os.path.join(outLoc, "SSURGO_express_properties" + geoExt)
 
             if bSingle == 'false' or bSingle == '#':
                 mkTbl(sdaItem)
@@ -852,8 +852,8 @@ if geoResponse:
     if bSingle == "true":
         descFlds = [(x.name).encode() for x in arcpy.Describe(path + os.sep + name + tblExt).fields]
         descFlds.remove("MUKEY")
-        arcpy.management.JoinField(outLoc + os.sep + "SSURGO_express_prop_polys" + geoExt, "mukey", path + os.sep + name + tblExt, "mukey", descFlds)
-        outFeats = os.path.join(outLoc, "SSURGO_express_prop_polys" + geoExt)
+        arcpy.management.JoinField(outLoc + os.sep + "SSURGO_express_properties" + geoExt, "mukey", path + os.sep + name + tblExt, "mukey", descFlds)
+        outFeats = os.path.join(outLoc, "SSURGO_express_properties" + geoExt)
         #arcpy.AddMessage(outFeats)
         sym(outFeats)
 

@@ -61,16 +61,17 @@ def errorMsg():
 def getIntrps(interp, areaSym, aggMethod):
 
     import socket
+    from urllib2 import HTTPError, URLError
 
     try:
-        if interp.find("<") <> -1:
-            interp = interp.replace("<", '&lt;')
-            #Msg = 'Illegal Character found in ' + interp +' name.  Skipping for ' + areaSym
-            #return False, Msg, None
-        elif interp.find(">") <> -1:
-            interp = interp.replace("<", '&gt;')
-            #Msg = 'Illegal Character found in ' + interp +' name.  Skipping for ' + areaSym
-            #return False, Msg, None
+##        if interp.find("<") <> -1:
+##            interp = interp.replace("<", '&lt;')
+##            #Msg = 'Illegal Character found in ' + interp +' name.  Skipping for ' + areaSym
+##            #return False, Msg, None
+##        elif interp.find(">") <> -1:
+##            interp = interp.replace("<", '&gt;')
+##            #Msg = 'Illegal Character found in ' + interp +' name.  Skipping for ' + areaSym
+##            #return False, Msg, None
 
         #arcpy.AddMessage(interp)
         #Not suited changed to Very Poorly Suited to align better with dominant condition and dominant component for wtd_avg
@@ -177,16 +178,16 @@ def getIntrps(interp, areaSym, aggMethod):
 
                 SELECT areasymbol, musym, muname, MUKEY, ISNULL (ROUND ((rating/sum_com),2), 99) AS rating,
                 CASE WHEN rating IS NULL THEN 'Not Rated'
-                WHEN design = 'suitability' AND  ROUND ((rating/sum_com),2) &lt; = 0 THEN 'Not suited'
-                WHEN design = 'suitability' AND  ROUND ((rating/sum_com),2)  &gt; 0.001 and  ROUND ((rating/sum_com),2)  &lt;=0.333 THEN 'Poorly suited'
-                WHEN design = 'suitability' AND  ROUND ((rating/sum_com),2)  &gt; 0.334 and  ROUND ((rating/sum_com),2)  &lt;=0.666  THEN 'Moderately suited'
-                WHEN design = 'suitability' AND  ROUND ((rating/sum_com),2)  &gt; 0.667 and  ROUND ((rating/sum_com),2)  &lt;=0.999  THEN 'Moderately well suited'
+                WHEN design = 'suitability' AND  ROUND ((rating/sum_com),2) < = 0 THEN 'Not suited'
+                WHEN design = 'suitability' AND  ROUND ((rating/sum_com),2)  > 0.001 and  ROUND ((rating/sum_com),2)  <=0.333 THEN 'Poorly suited'
+                WHEN design = 'suitability' AND  ROUND ((rating/sum_com),2)  > 0.334 and  ROUND ((rating/sum_com),2)  <=0.666  THEN 'Moderately suited'
+                WHEN design = 'suitability' AND  ROUND ((rating/sum_com),2)  > 0.667 and  ROUND ((rating/sum_com),2)  <=0.999  THEN 'Moderately well suited'
                 WHEN design = 'suitability' AND  ROUND ((rating/sum_com),2)   = 1  THEN 'Well suited'
 
-                WHEN design = 'limitation' AND  ROUND ((rating/sum_com),2) &lt; = 0 THEN 'Not limited '
-                WHEN design = 'limitation' AND  ROUND ((rating/sum_com),2)  &gt; 0.001 and  ROUND ((rating/sum_com),2)  &lt;=0.333 THEN 'Slightly limited '
-                WHEN design = 'limitation' AND  ROUND ((rating/sum_com),2)  &gt; 0.334 and  ROUND ((rating/sum_com),2)  &lt;=0.666  THEN 'Somewhat limited '
-                WHEN design = 'limitation' AND  ROUND ((rating/sum_com),2)  &gt; 0.667 and  ROUND ((rating/sum_com),2)  &lt;=0.999  THEN 'Moderately limited '
+                WHEN design = 'limitation' AND  ROUND ((rating/sum_com),2) < = 0 THEN 'Not limited '
+                WHEN design = 'limitation' AND  ROUND ((rating/sum_com),2)  > 0.001 and  ROUND ((rating/sum_com),2)  <=0.333 THEN 'Slightly limited '
+                WHEN design = 'limitation' AND  ROUND ((rating/sum_com),2)  > 0.334 and  ROUND ((rating/sum_com),2)  <=0.666  THEN 'Somewhat limited '
+                WHEN design = 'limitation' AND  ROUND ((rating/sum_com),2)  > 0.667 and  ROUND ((rating/sum_com),2)  <=0.999  THEN 'Moderately limited '
                 WHEN design = 'limitation' AND  ROUND ((rating/sum_com),2)  = 1 THEN 'Very limited' END AS class, reason
                 FROM #main
                 DROP TABLE #main"""
@@ -229,78 +230,69 @@ def getIntrps(interp, areaSym, aggMethod):
 
 
         #arcpy.AddMessage(interpQry.replace("&gt;", ">").replace("&lt;", "<"))
+        #arcpy.AddMessage(interpQry)
         # Send XML query to SDM Access service
-        sXML = """<?xml version="1.0" encoding="utf-8"?>
-        <soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
-        <soap12:Body>
-        <RunQuery xmlns="http://SDMDataAccess.nrcs.usda.gov/Tabular/SDMTabularService.asmx">
-          <Query>""" + interpQry + """</Query>
-        </RunQuery>
-        </soap12:Body>
-        </soap12:Envelope>"""
-
-        dHeaders = dict()
-        dHeaders["Host"      ] = "sdmdataaccess.nrcs.usda.gov"
-        #dHeaders["User-Agent"] = "NuSOAP/0.7.3 (1.114)"
-        #dHeaders["Content-Type"] = "application/soap+xml; charset=utf-8"
-        dHeaders["Content-Type"] = "text/xml; charset=utf-8"
-        dHeaders["SOAPAction"] = "http://SDMDataAccess.nrcs.usda.gov/Tabular/SDMTabularService.asmx/RunQuery"
-        dHeaders["Content-Length"] = len(sXML)
-        sURL = "SDMDataAccess.nrcs.usda.gov"
-
-        # Create SDM connection to service using HTTP
-        conn = httplib.HTTPConnection(sURL, 80)
-
-        # Send request in XML-Soap
-        conn.request("POST", "/Tabular/SDMTabularService.asmx", sXML, dHeaders)
-
-        # Get back XML response
-        response = conn.getresponse()
-
-        cStatus = response.status
-        cResponse = response.reason
-
-        #AddMsgAndPrint(str(cStatus) + ": " + cResponse)
-
-        xmlString = response.read()
-
-        # Close connection to SDM
-        conn.close()
-
-        # Convert XML to tree format
-        tree = ET.fromstring(xmlString)
-
-        # Iterate through XML tree, finding required elements...
-        #areasymbol, musym, muname, mu.mukey, comppct_r
 
         funcDict = dict()
 
-        #grab the records
-        for rec in tree.iter():
+        theURL = "https://sdmdataaccess.nrcs.usda.gov"
+        url = theURL + "/Tabular/SDMTabularService/post.rest"
 
-            if rec.tag =="areasymbol":
-                areasymbol = str(rec.text)
+        # Create request using JSON, return data as JSON
+        request = {}
+        request["FORMAT"] = "JSON"
+        request["QUERY"] = interpQry
 
-            if rec.tag =="musym":
-                musym = str(rec.text)
+        #json.dumps = serialize obj (request dictionary) to a JSON formatted str
+        data = json.dumps(request)
 
-            if rec.tag =="muname":
-                muname = str(rec.text)
+        # Send request to SDA Tabular service using urllib2 library
+        # because we are passing the "data" argument, this is a POST request, not a GET
+        req = urllib2.Request(url, data)
+        response = urllib2.urlopen(req)
 
-            if rec.tag =="MUKEY":
-                mukey = str(rec.text)
+        # read query results
+        qResults = response.read()
 
-            if rec.tag =="rating":
+        # Convert the returned JSON string into a Python dictionary.
+        qData = json.loads(qResults)
+
+        # get rid of objects
+        del qResults, response, req
+
+        # Once data section (key='Table') is found in result...
+        valList = []
+
+        # if dictionary key "Table" is found
+        if "Table" in qData:
+            cResponse = 'OK'
+
+            #grab the records
+            resLst = qData["Table"]
+
+            for e in resLst:
+
+                areasymbol = e[0]
+                musym = e[1]
+                muname = e[2]
+                mukey = e[3]
+                rating = e[4]
+                class_name = e[5]
+                reason = e[6]
+
                 try:
-                    rating = float(rec.text)
+                    rating = float(rating)
                 except:
-                    rating = -1
+                    rating = None
 
-            if rec.tag =="class":
-                class_name = str(rec.text)
+                try:
 
-            if rec.tag == 'reason':
-                reason = str(rec.text)
+                    parser = HTMLParser()
+                    reason = parser.unescape(reason)
+
+                except:
+                    reason = reason
+
 
                 #collect the results
                 funcDict[mukey] = mukey, int(mukey), areasymbol, musym, muname, rating, class_name, reason
@@ -317,6 +309,14 @@ def getIntrps(interp, areaSym, aggMethod):
         Msg = 'Socket error: ' + str(e)
         return False, Msg, None
 
+    except HTTPError as e:
+        Msg = 'HTTP Error: ' + str(e)
+        return False, Msg, None
+
+    except URLError as e:
+        Msg = 'URL Error: ' + str(e)
+        return False, Msg, None
+
     except:
         errorMsg()
         Msg = 'Unknown error collecting interpreations for ' + eSSA
@@ -324,8 +324,9 @@ def getIntrps(interp, areaSym, aggMethod):
 
 #===============================================================================
 
-import arcpy, sys, os, traceback, time, httplib
-import xml.etree.cElementTree as ET
+import arcpy, sys, os, traceback, time, urllib2, json
+from HTMLParser import HTMLParser
+
 
 arcpy.env.overwriteOutput = True
 
