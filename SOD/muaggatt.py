@@ -11,8 +11,8 @@
 #This tool generates a muaggatt table from Soil Data Access on an soil survey area basis.
 #It is designed to be used as a BATCH tool
 #
-#headers of the SOAP request code are from Steve Peaslee's
-#SSURGO Download Tool - Downlaod By Map's validation class
+#
+#Updated to https 2017/02/23
 #
 #
 #
@@ -57,102 +57,111 @@ def errorMsg():
 
 def getMuaggatt(aSym, ordLst):
 
+    import socket
+
+    funcDict = dict()
+
     try:
 
-        #containers
-        fltFlds = ['slopegraddcp', 'slopegradwta', 'aws025wta', 'aws050wta', 'aws0100wta', 'aws0150wta', 'urbrecptwta', 'awmmfpwwta']
-        strFlds = ['musym', 'muname', 'mustatus', 'flodfreqdcd', 'flodfreqmax', 'pondfreqprs', 'drclassdcd', 'drclasswettest', 'hydgrpdcd', 'iccdcd', 'niccdcd', 'engdwobdcd', 'engdwbdcd', 'engdwbll', 'engdwbml', 'engstafdcd', 'engstafll', 'engstafml', 'engsldcd', 'engsldcp', 'englrsdcd', 'engcmssdcd', 'engcmssmp', 'urbrecptdcd', 'forpehrtdcp', 'hydclprs', 'mukey']
-        intFlds = ['brockdepmin', 'wtdepannmin', 'wtdepaprjunmin', 'iccdcdpct', 'niccdcdpct']
+        muaggatQry = \
+        """SELECT ma.musym,ma.muname,ma.mustatus,ma.slopegraddcp,ma.slopegradwta,ma.brockdepmin,ma.wtdepannmin,ma.wtdepaprjunmin,ma.flodfreqdcd,ma.flodfreqmax,ma.pondfreqprs,ma.aws025wta,ma.aws050wta,ma.aws0100wta,
+        ma.aws0150wta,ma.drclassdcd,ma.drclasswettest,ma.hydgrpdcd,ma.iccdcd,ma.iccdcdpct,ma.niccdcd,ma.niccdcdpct,ma.engdwobdcd,ma.engdwbdcd,ma.engdwbll,ma.engdwbml,ma.engstafdcd,ma.engstafll,ma.engstafml,ma.engsldcd,ma.engsldcp,
+        ma.englrsdcd,ma.engcmssdcd,ma.engcmssmp,ma.urbrecptdcd,ma.urbrecptwta,ma.forpehrtdcp,ma.hydclprs,ma.awmmfpwwta,ma.mukey
+        FROM legend
+        INNER JOIN mapunit ON mapunit.lkey=legend.lkey
+        INNER JOIN muaggatt ma ON mapunit.mukey=ma.mukey
+        WHERE areasymbol = '""" + aSym + """'"""
 
-        funcDict = dict()
+        print muaggatQry
 
-        #muaggatt Query
-        muaggattQry = "SELECT ma.musym,ma.muname,ma.mustatus,ma.slopegraddcp,ma.slopegradwta,ma.brockdepmin,ma.wtdepannmin,ma.wtdepaprjunmin,ma.flodfreqdcd,ma.flodfreqmax,ma.pondfreqprs,ma.aws025wta,ma.aws050wta,ma.aws0100wta,\n"\
-        " ma.aws0150wta,ma.drclassdcd,ma.drclasswettest,ma.hydgrpdcd,ma.iccdcd,ma.iccdcdpct,ma.niccdcd,ma.niccdcdpct,ma.engdwobdcd,ma.engdwbdcd,ma.engdwbll,ma.engdwbml,ma.engstafdcd,ma.engstafll,ma.engstafml,ma.engsldcd,ma.engsldcp,\n"\
-        " ma.englrsdcd,ma.engcmssdcd,ma.engcmssmp,ma.urbrecptdcd,ma.urbrecptwta,ma.forpehrtdcp,ma.hydclprs,ma.awmmfpwwta,ma.mukey"\
-        " FROM legend\n"\
-        " INNER JOIN mapunit ON mapunit.lkey=legend.lkey\n"\
-        " INNER JOIN muaggatt ma ON mapunit.mukey=ma.mukey\n"\
-        " WHERE areasymbol = '" + aSym + "'"
+        theURL = "https://sdmdataaccess.nrcs.usda.gov"
+        url = theURL + "/Tabular/SDMTabularService/post.rest"
 
-        #print muaggattQry
+        # Create request using JSON, return data as JSON
+        request = {}
+        request["FORMAT"] = "JSON"
+        request["QUERY"] = muaggatQry
 
-        #send the soap request
-        sXML = """<?xml version="1.0" encoding="utf-8"?>
-                <soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
-                <soap12:Body>
-                <RunQuery xmlns="http://SDMDataAccess.nrcs.usda.gov/Tabular/SDMTabularService.asmx">
-                  <Query>""" + muaggattQry + """</Query>
-                </RunQuery>
-                </soap12:Body>
-                </soap12:Envelope>"""
+        #json.dumps = serialize obj (request dictionary) to a JSON formatted str
+        data = json.dumps(request)
 
-        dHeaders = dict()
-        dHeaders["Host"      ] = "sdmdataaccess.nrcs.usda.gov"
-        #dHeaders["User-Agent"] = "NuSOAP/0.7.3 (1.114)"
-        #dHeaders["Content-Type"] = "application/soap+xml; charset=utf-8"
-        dHeaders["Content-Type"] = "text/xml; charset=utf-8"
-        dHeaders["SOAPAction"] = "http://SDMDataAccess.nrcs.usda.gov/Tabular/SDMTabularService.asmx/RunQuery"
-        dHeaders["Content-Length"] = len(sXML)
-        sURL = "SDMDataAccess.nrcs.usda.gov"
+        # Send request to SDA Tabular service using urllib2 library
+        # because we are passing the "data" argument, this is a POST request, not a GET
+        req = urllib2.Request(url, data)
+        response = urllib2.urlopen(req)
 
-        # Create SDM connection to service using HTTP
-        conn = httplib.HTTPConnection(sURL, 80)
+        code = response.getcode()
+        cResponse = bhrh.responses.get(code)
+        cResponse = "{}; {}".format(cResponse[0], cResponse[1])
+        print cResponse
 
-        # Send request in XML-Soap
-        conn.request("POST", "/Tabular/SDMTabularService.asmx", sXML, dHeaders)
+        # read query results
+        qResults = response.read()
 
-        # Get back XML response
-        response = conn.getresponse()
+        # Convert the returned JSON string into a Python dictionary.
+        qData = json.loads(qResults)
 
-        cStatus = response.status
-        cResponse = response.reason
+        print qData
 
-        #PrintMsg(str(cStatus) + ": " + cResponse)
-
-        xmlString = response.read()
-
-        # Close connection to SDM
-        conn.close()
-
-        # Convert XML to tree format
-        root = ET.fromstring(xmlString)
+        # get rid of objects
+        del qResults, response, req
 
 
-        for child in root.iter('Table'):
+        # if dictionary key "Table" is found
+        if "Table" in qData:
 
-            #create a list to accumulate values for each mapunit
-            hldrLst = list()
 
-            #loop thru the ordered list and get corresponding value from xml
-            #and add it to list
-            for eFld in ordLst:
-                eRes = child.find(eFld).text
+            # get its value
+            # a list of lists
+            resLst = qData["Table"]
 
-                #test and  convert values to appropriate data type
-                #convert to None type if no value returned
-                if eFld in strFlds:
-                    if str(eRes):
-                        eRes = eRes
-                    else:
-                        eRes = None
+         #containers
 
-                if eFld in fltFlds:
-                    try:
-                        eRes = float(eRes)
-                    except:
-                        eRes = None
+            #the ordLst is the order of the list returned from SDA.  This allows us to step through each returned list/row
+            #and convert to appropriate data type
+            ordLst = ['musym', 'muname', 'mustatus', 'slopegraddcp', 'slopegradwta', 'brockdepmin', 'wtdepannmin', 'wtdepaprjunmin', 'flodfreqdcd', 'flodfreqmax', 'pondfreqprs', 'aws025wta', 'aws050wta', 'aws0100wta', 'aws0150wta', 'drclassdcd', 'drclasswettest', 'hydgrpdcd', 'iccdcd', 'iccdcdpct', 'niccdcd', 'niccdcdpct', 'engdwobdcd', 'engdwbdcd', 'engdwbll', 'engdwbml', 'engstafdcd', 'engstafll', 'engstafml', 'engsldcd', 'engsldcp', 'englrsdcd', 'engcmssdcd', 'engcmssmp', 'urbrecptdcd', 'urbrecptwta', 'forpehrtdcp', 'hydclprs', 'awmmfpwwta', 'mukey']
+            fltFlds = ['slopegraddcp', 'slopegradwta', 'aws025wta', 'aws050wta', 'aws0100wta', 'aws0150wta', 'urbrecptwta', 'awmmfpwwta']
+            strFlds = ['musym', 'muname', 'mustatus', 'flodfreqdcd', 'flodfreqmax', 'pondfreqprs', 'drclassdcd', 'drclasswettest', 'hydgrpdcd', 'iccdcd', 'niccdcd', 'engdwobdcd', 'engdwbdcd', 'engdwbll', 'engdwbml', 'engstafdcd', 'engstafll', 'engstafml', 'engsldcd', 'engsldcp', 'englrsdcd', 'engcmssdcd', 'engcmssmp', 'urbrecptdcd', 'forpehrtdcp', 'hydclprs', 'mukey']
+            intFlds = ['brockdepmin', 'wtdepannmin', 'wtdepaprjunmin', 'iccdcdpct', 'niccdcdpct']
 
-                if eFld in intFlds:
-                    try:
-                        eRes = int(eRes)
-                    except:
-                        eRes = None
 
-                hldrLst.append(eRes)
 
-            #put the list for each mapunit into a dictionary.  dict keys are mukeys.
-            funcDict[hldrLst[-1]]= hldrLst
+            for tblRow in resLst:
+                convertedList = list()
+                position = 0
+
+                # element corresponds to field
+                # for field in the row
+                for element in tblRow:
+
+                    # get the field name coresponding to position in ordLst
+                    eleName = ordLst[position]
+
+                    if eleName in strFlds:
+                            if str(element):
+                                element = element
+                            else:
+                                element = None
+
+                    if eleName in fltFlds:
+                        try:
+                            element = float(element)
+                        except:
+                            element = None
+
+                    if eleName in intFlds:
+                        try:
+                            element = int(element)
+                        except:
+                            element = None
+
+                    convertedList.append(element)
+                    position+=1
+
+
+
+                #put the list for each mapunit into a dictionary.  dict keys are mukeys.
+                funcDict[convertedList[-1]]= convertedList
 
         return True, funcDict, cResponse
 
@@ -173,8 +182,9 @@ def getMuaggatt(aSym, ordLst):
 
 #===============================================================================
 
-import arcpy, sys, os, traceback, time, httplib
-import xml.etree.cElementTree as ET
+import arcpy, sys, os, traceback, time, httplib, urllib2, json
+from BaseHTTPServer import BaseHTTPRequestHandler as bhrh
+#import xml.etree.cElementTree as ET
 
 arcpy.env.overwriteOutput = True
 

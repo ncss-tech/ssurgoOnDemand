@@ -58,130 +58,116 @@ def errorMsg():
 
 
 
-def getHyd(areaSym, ordLst):
+def getHyd(areaSym):
 
     import socket
 
     funcDict = dict()
 
     try:
+        #fldLst = ['AREASYMBOL', 'MUKEY', 'int_MUKEY', 'MUSYM', 'MUNAME', 'HYDRIC_RATING']
+
         hydQry = \
-        "  SELECT \n" \
-        "  AREASYMBOL, \n" \
-        "  MUSYM, \n" \
-        "  MUNAME,\n" \
-        "  mu.mukey/1  AS MUKEY,\n" \
-        "  (SELECT TOP 1 COUNT_BIG(*)\n" \
-        "  FROM mapunit\n" \
-        "  INNER JOIN component ON component.mukey=mapunit.mukey AND mapunit.mukey = mu.mukey) AS comp_count,\n" \
-        "  (SELECT TOP 1 COUNT_BIG(*)\n" \
-        "  FROM mapunit\n" \
-        "  INNER JOIN component ON component.mukey=mapunit.mukey AND mapunit.mukey = mu.mukey\n" \
-        "  AND majcompflag = 'Yes') AS count_maj_comp,\n" \
-        "  (SELECT TOP 1 COUNT_BIG(*)\n" \
-        "  FROM mapunit\n" \
-        "  INNER JOIN component ON component.mukey=mapunit.mukey AND mapunit.mukey = mu.mukey\n" \
-        "  AND hydricrating = 'Yes' ) AS all_hydric,\n" \
-        "  (SELECT TOP 1 COUNT_BIG(*)\n" \
-        "  FROM mapunit\n" \
-        "  INNER JOIN component ON component.mukey=mapunit.mukey AND mapunit.mukey = mu.mukey\n" \
-        "  AND majcompflag = 'Yes' AND hydricrating = 'Yes') AS maj_hydric,\n" \
-        "  (SELECT TOP 1 COUNT_BIG(*)\n" \
-        "  FROM mapunit\n" \
-        "  INNER JOIN component ON component.mukey=mapunit.mukey AND mapunit.mukey = mu.mukey\n" \
-        "  AND majcompflag = 'Yes' AND hydricrating != 'Yes') AS maj_not_hydric,\n" \
-        "   (SELECT TOP 1 COUNT_BIG(*)\n" \
-        "  FROM mapunit\n" \
-        "  INNER JOIN component ON component.mukey=mapunit.mukey AND mapunit.mukey = mu.mukey\n" \
-        "  AND majcompflag != 'Yes' AND hydricrating  = 'Yes' ) AS hydric_inclusions,\n" \
-        "  (SELECT TOP 1 COUNT_BIG(*)\n" \
-        "  FROM mapunit\n" \
-        "  INNER JOIN component ON component.mukey=mapunit.mukey AND mapunit.mukey = mu.mukey\n" \
-        "  AND hydricrating  != 'Yes') AS all_not_hydric, \n" \
-        "   (SELECT TOP 1 COUNT_BIG(*)\n" \
-        "  FROM mapunit\n" \
-        "  INNER JOIN component ON component.mukey=mapunit.mukey AND mapunit.mukey = mu.mukey\n" \
-        "  AND hydricrating  IS NULL ) AS hydric_null \n" \
-        "  INTO #main_query\n" \
-        "  FROM legend  AS l\n" \
-        "  INNER JOIN  mapunit AS mu ON mu.lkey = l.lkey AND  l.areasymbol LIKE '" + areaSym + "'\n" \
-        "  \n" \
-        "  \n" \
-        " SELECT  AREASYMBOL, MUSYM, MUNAME, MUKEY,\n" \
-        " CASE WHEN comp_count = all_not_hydric + hydric_null THEN  'Nonhydric' \n" \
-        " WHEN comp_count = all_hydric  THEN 'Hydric' \n" \
-        " WHEN comp_count != all_hydric AND count_maj_comp = maj_hydric THEN 'Predominantly Hydric' \n" \
-        " WHEN hydric_inclusions &gt;= 0.5 AND  maj_hydric &lt; 0.5 THEN  'Predominantly Nonhydric' \n" \
-        " WHEN maj_not_hydric &gt;= 0.5  AND  maj_hydric &gt;= 0.5 THEN 'Partially Hydric' ELSE 'Error' END AS HYDRIC_RATING\n" \
-        " FROM #main_query\n"
-
-        #arcpy.AddMessage(hydQry.replace("&gt;", ">").replace("&lt;", "<"))
+        """SELECT
+        AREASYMBOL,
+        MUSYM,
+        MUNAME,
+        mu.mukey/1  AS MUKEY,
+        (SELECT TOP 1 COUNT_BIG(*)
+        FROM mapunit
+        INNER JOIN component ON component.mukey=mapunit.mukey AND mapunit.mukey = mu.mukey) AS comp_count,
+        (SELECT TOP 1 COUNT_BIG(*)
+        FROM mapunit
+        INNER JOIN component ON component.mukey=mapunit.mukey AND mapunit.mukey = mu.mukey
+        AND majcompflag = 'Yes') AS count_maj_comp,
+        (SELECT TOP 1 COUNT_BIG(*)
+        FROM mapunit
+        INNER JOIN component ON component.mukey=mapunit.mukey AND mapunit.mukey = mu.mukey
+        AND hydricrating = 'Yes' ) AS all_hydric,
+        (SELECT TOP 1 COUNT_BIG(*)
+        FROM mapunit
+        INNER JOIN component ON component.mukey=mapunit.mukey AND mapunit.mukey = mu.mukey
+        AND majcompflag = 'Yes' AND hydricrating = 'Yes') AS maj_hydric,
+        (SELECT TOP 1 COUNT_BIG(*)
+        FROM mapunit
+        INNER JOIN component ON component.mukey=mapunit.mukey AND mapunit.mukey = mu.mukey
+        AND majcompflag = 'Yes' AND hydricrating != 'Yes') AS maj_not_hydric,
+         (SELECT TOP 1 COUNT_BIG(*)
+        FROM mapunit
+        INNER JOIN component ON component.mukey=mapunit.mukey AND mapunit.mukey = mu.mukey
+        AND majcompflag != 'Yes' AND hydricrating  = 'Yes' ) AS hydric_inclusions,
+        (SELECT TOP 1 COUNT_BIG(*)
+        FROM mapunit
+        INNER JOIN component ON component.mukey=mapunit.mukey AND mapunit.mukey = mu.mukey
+        AND hydricrating  != 'Yes') AS all_not_hydric,
+         (SELECT TOP 1 COUNT_BIG(*)
+        FROM mapunit
+        INNER JOIN component ON component.mukey=mapunit.mukey AND mapunit.mukey = mu.mukey
+        AND hydricrating  IS NULL ) AS hydric_null
+        INTO #main_query
+        FROM legend  AS l
+        INNER JOIN  mapunit AS mu ON mu.lkey = l.lkey AND  l.areasymbol LIKE '"""+ areaSym + """'
 
 
-        #send the soap request
-        sXML = """<?xml version="1.0" encoding="utf-8"?>
-                <soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
-                <soap12:Body>
-                <RunQuery xmlns="http://SDMDataAccess.nrcs.usda.gov/Tabular/SDMTabularService.asmx">
-                  <Query>""" + hydQry + """</Query>
-                </RunQuery>
-                </soap12:Body>
-                </soap12:Envelope>"""
+        SELECT  AREASYMBOL, MUKEY, MUSYM, MUNAME,
+        CASE WHEN comp_count = all_not_hydric + hydric_null THEN  'Nonhydric'
+        WHEN comp_count = all_hydric  THEN 'Hydric'
+        WHEN comp_count != all_hydric AND count_maj_comp = maj_hydric THEN 'Predominantly Hydric'
+        WHEN hydric_inclusions &gt;= 0.5 AND  maj_hydric &lt; 0.5 THEN  'Predominantly Nonhydric'
+        WHEN maj_not_hydric &gt;= 0.5  AND  maj_hydric &gt;= 0.5 THEN 'Partially Hydric' ELSE 'Error' END AS HYDRIC_RATING
+        FROM #main_query"""
 
-        dHeaders = dict()
-        dHeaders["Host"      ] = "sdmdataaccess.nrcs.usda.gov"
-        #dHeaders["User-Agent"] = "NuSOAP/0.7.3 (1.114)"
-        #dHeaders["Content-Type"] = "application/soap+xml; charset=utf-8"
-        dHeaders["Content-Type"] = "text/xml; charset=utf-8"
-        dHeaders["SOAPAction"] = "http://SDMDataAccess.nrcs.usda.gov/Tabular/SDMTabularService.asmx/RunQuery"
-        dHeaders["Content-Length"] = len(sXML)
-        sURL = "SDMDataAccess.nrcs.usda.gov"
+        #print hydQry.replace("&gt;", ">").replace("&lt;", "<")
+        hydQry = hydQry.replace("&gt;", ">").replace("&lt;", "<")
 
-        # Create SDM connection to service using HTTP
-        conn = httplib.HTTPConnection(sURL, 80)
+        theURL = "https://sdmdataaccess.nrcs.usda.gov"
+        url = theURL + "/Tabular/SDMTabularService/post.rest"
 
-        # Send request in XML-Soap
-        conn.request("POST", "/Tabular/SDMTabularService.asmx", sXML, dHeaders)
+        # Create request using JSON, return data as JSON
+        request = {}
+        request["FORMAT"] = "JSON"
+        request["QUERY"] = hydQry
 
-        # Get back XML response
-        response = conn.getresponse()
+        #json.dumps = serialize obj (request dictionary) to a JSON formatted str
+        data = json.dumps(request)
 
-        cStatus = response.status
-        cResponse = response.reason
+        # Send request to SDA Tabular service using urllib2 library
+        # because we are passing the "data" argument, this is a POST request, not a GET
+        req = urllib2.Request(url, data)
+        response = urllib2.urlopen(req)
 
-        #AddMsgAndPrint(str(cStatus) + ": " + cResponse)
+        code = response.getcode()
+        cResponse = bhrh.responses.get(code)
+        cResponse = "{}; {}".format(cResponse[0], cResponse[1])
+        print cResponse
 
-        xmlString = response.read()
+        # read query results
+        qResults = response.read()
 
-        # Close connection to SDM
-        conn.close()
+        # Convert the returned JSON string into a Python dictionary.
+        qData = json.loads(qResults)
 
-        # Convert XML to tree format
-        root = ET.fromstring(xmlString)
+        #print qData
 
-        for child in root.iter('Table'):
-
-            #create a list to accumulate values for each mapunit
-            hldrLst = list()
-
-            #loop thru the ordered list and get corresponding value from xml
-            #and add it to list
-            for eFld in ordLst:
-                eRes = child.find(eFld).text
-                if str(eRes):
-                    eRes = eRes
-                else:
-                    eRes = None
+        # get rid of objects
+        del qResults, response, req
 
 
-                hldrLst.append(eRes)
+        # if dictionary key "Table" is found
+        if "Table" in qData:
 
-            #get interger mukey into the list
-            hldrLst.insert(2, int(hldrLst[1]))
-            #arcpy.AddMessage(hldrLst)
 
-            #put the list for each mapunit into a dictionary.  dict keys are mukeys.
-            funcDict[hldrLst[1]]= hldrLst
+            # get its value
+            # a list of lists
+            resLst = qData["Table"]
+
+            for res in resLst:
+                #insert integer copy of mukey into list at position 3
+                res.insert(2, int(res[1]))
+
+
+                #put the list for each mapunit into a dictionary.  dict keys are mukeys.
+                funcDict[res[1]] = res
 
         return True, funcDict, cResponse
 
@@ -202,8 +188,8 @@ def getHyd(areaSym, ordLst):
 
 #===============================================================================
 
-import arcpy, sys, os, traceback, time, httplib
-import xml.etree.cElementTree as ET
+import arcpy, sys, os, traceback, time, httplib, urllib2, json
+from BaseHTTPServer import BaseHTTPRequestHandler as bhrh
 
 arcpy.env.overwriteOutput = True
 
@@ -217,7 +203,7 @@ jLayer = arcpy.GetParameterAsText(3)
 #arcpy.AddMessage(nullParam)
 srcDir = os.path.dirname(sys.argv[0])
 
-ordLst = ['AREASYMBOL', 'MUKEY', 'MUSYM', 'MUNAME', 'HYDRIC_RATING']
+#ordLst = ['AREASYMBOL', 'MUKEY', 'MUSYM', 'MUNAME', 'HYDRIC_RATING']
 
 try:
     areaList = areaParam.split(";")
@@ -237,7 +223,7 @@ try:
 
         #send the request
         #True, funcDict, cResponse
-        gP1, gP2, gP3 = getHyd(eSSA, ordLst)
+        gP1, gP2, gP3 = getHyd(eSSA)
 
         #if it was successful...
         if gP1:
@@ -254,7 +240,7 @@ try:
         #if it was unsuccessful...
         else:
             #try again
-            gP1, gP2, gP3 = getHyd(eSSA, ordLst)
+            gP1, gP2, gP3 = getHyd(eSSA)
 
             #if 2nd run was successful
             if gP1:
