@@ -243,12 +243,9 @@ def getPMgrp(areaSym, ordLst, dBool):
 
         # Convert the returned JSON string into a Python dictionary.
         qData = json.loads(qResults)
-        #print qData
-
 
         # get rid of objects
         del qResults, response, req
-
 
         # if dictionary key "Table" is found
         if "Table" in qData:
