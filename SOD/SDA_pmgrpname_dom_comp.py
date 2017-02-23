@@ -8,12 +8,12 @@
 #
 # Created:     31/03/2015
 #
-#This tool grabs interprtations from Soil Data Access and aggregates based on user specified method.
+#This tool grabs soil parent material group names from Soil Data Access .
 #It is designed to be used as a BATCH tool
 #Soil Data Access SQL code is from Jason Nemecek
 #SOAP request code is from Steve Peaslee's SSURGO Download Tool - Downlaod By Map's validation class
 #
-#
+#SOAP request deprecated on SDA.  Updated to POST 2017/02/22
 #
 #
 #
@@ -61,224 +61,211 @@ def errorMsg():
 def getPMgrp(areaSym, ordLst, dBool):
 
     import socket
+    from BaseHTTPServer import BaseHTTPRequestHandler as bhrh
 
     try:
 
         funcDict = dict()
 
         if dBool == "true":
-            pmQry = "SELECT \n" \
-            " sacatalog.areasymbol AS areasymbol, \n" \
-            " mapunit.mukey AS mukey, \n" \
-            " mapunit.musym AS musym,\n" \
-            " mapunit.muname AS muname,\n" \
-            " compname,\n" \
-            " comppct_r , \n" \
-            " \n" \
-            " CASE WHEN pmgroupname LIKE '%Calcareous loess%' THEN 'Eolian Deposits (nonvolcanic)'\n" \
-            " WHEN pmgroupname LIKE '%Eolian deposits%' THEN 'Eolian Deposits (nonvolcanic)'\n" \
-            " WHEN pmgroupname LIKE '%Eolian sands%' THEN 'Eolian Deposits (nonvolcanic)'\n" \
-            " WHEN pmgroupname LIKE '%Loess%' THEN 'Eolian Deposits (nonvolcanic)'\n" \
-            " WHEN pmgroupname LIKE '%Noncalcareous loess%' THEN 'Eolian Deposits (nonvolcanic)'\n" \
-            " WHEN pmgroupname LIKE '%Ablation till%' THEN 'Glacial and Periglacial Deposits'\n" \
-            " WHEN pmgroupname LIKE '%Basal till%' THEN 'Glacial and Periglacial Deposits'\n" \
-            " WHEN pmgroupname LIKE '%Cryoturbate%' THEN 'Glacial and Periglacial Deposits'\n" \
-            " WHEN pmgroupname LIKE '%Drift%' THEN 'Glacial and Periglacial Deposits'\n" \
-            " WHEN pmgroupname LIKE '%Flow till%' THEN 'Glacial and Periglacial Deposits'\n" \
-            " WHEN pmgroupname LIKE '%Glaciofluvial deposits%' THEN 'Glacial and Periglacial Deposits'\n" \
-            " WHEN pmgroupname LIKE '%Glaciolacustrine deposits%' THEN 'Glacial and Periglacial Deposits'\n" \
-            " WHEN pmgroupname LIKE '%Glaciomarine deposits%' THEN 'Glacial and Periglacial Deposits'\n" \
-            " WHEN pmgroupname LIKE '%Lodgment till%' THEN 'Glacial and Periglacial Deposits'\n" \
-            " WHEN pmgroupname LIKE '%Melt-out till%' THEN 'Glacial and Periglacial Deposits'\n" \
-            " WHEN pmgroupname LIKE '%Outwash%' THEN 'Glacial and Periglacial Deposits'\n" \
-            " WHEN pmgroupname LIKE '%Solifluction deposits%' THEN 'Glacial and Periglacial Deposits'\n" \
-            " WHEN pmgroupname LIKE '%Subglacial till%' THEN 'Glacial and Periglacial Deposits'\n" \
-            " WHEN pmgroupname LIKE '%Supraglacial meltout till%' THEN 'Glacial and Periglacial Deposits'\n" \
-            " WHEN pmgroupname LIKE '%Supraglacial till%' THEN 'Glacial and Periglacial Deposits'\n" \
-            " WHEN pmgroupname LIKE '%Till%' THEN 'Glacial and Periglacial Deposits'\n" \
-            " WHEN pmgroupname LIKE '%Bauxite%' THEN 'In-Place Deposits (nontransported)'\n" \
-            " WHEN pmgroupname LIKE '%Grus%' THEN 'In-Place Deposits (nontransported)'\n" \
-            " WHEN pmgroupname LIKE '%Residuum%' THEN 'In-Place Deposits (nontransported)'\n" \
-            " WHEN pmgroupname LIKE '%Saprolite%' THEN 'In-Place Deposits (nontransported)'\n" \
-            " WHEN pmgroupname LIKE '%Colluvium%' THEN 'Mass Movement Deposits'\n" \
-            " WHEN pmgroupname LIKE '%Complex landslide deposits%' THEN 'Mass Movement Deposits'\n" \
-            " WHEN pmgroupname LIKE '%Creep deposits%' THEN 'Mass Movement Deposits'\n" \
-            " WHEN pmgroupname LIKE '%Debris avalanche deposits%' THEN 'Mass Movement Deposits'\n" \
-            " WHEN pmgroupname LIKE '%Debris flow deposits%' THEN 'Mass Movement Deposits'\n" \
-            " WHEN pmgroupname LIKE '%Debris slide deposits%' THEN 'Mass Movement Deposits'\n" \
-            " WHEN pmgroupname LIKE '%Debris spread deposits%' THEN 'Mass Movement Deposits'\n" \
-            " WHEN pmgroupname LIKE '%Debris topple deposits%' THEN 'Mass Movement Deposits'\n" \
-            " WHEN pmgroupname LIKE '%Earth spread deposits%' THEN 'Mass Movement Deposits'\n" \
-            " WHEN pmgroupname LIKE '%Earthflow deposits%' THEN 'Mass Movement Deposits'\n" \
-            " WHEN pmgroupname LIKE '%Flow deposits%' THEN 'Mass Movement Deposits'\n" \
-            " WHEN pmgroupname LIKE '%Lateral spread deposits%' THEN 'Mass Movement Deposits'\n" \
-            " WHEN pmgroupname LIKE '%Mass movement deposits%' THEN 'Mass Movement Deposits'\n" \
-            " WHEN pmgroupname LIKE '%Mudflow deposits%' THEN 'Mass Movement Deposits'\n" \
-            " WHEN pmgroupname LIKE '%Rock spread deposits%' THEN 'Mass Movement Deposits'\n" \
-            " WHEN pmgroupname LIKE '%Rock topple deposits%' THEN 'Mass Movement Deposits'\n" \
-            " WHEN pmgroupname LIKE '%Rockfall avalanche deposits%' THEN 'Mass Movement Deposits'\n" \
-            " WHEN pmgroupname LIKE '%Rockfall deposits%' THEN 'Mass Movement Deposits'\n" \
-            " WHEN pmgroupname LIKE '%Rotational earth slide deposits%' THEN 'Mass Movement Deposits'\n" \
-            " WHEN pmgroupname LIKE '%Rotational slide deposits%' THEN 'Mass Movement Deposits'\n" \
-            " WHEN pmgroupname LIKE '%Sand flow deposits%' THEN 'Mass Movement Deposits'\n" \
-            " WHEN pmgroupname LIKE '%Scree%' THEN 'Mass Movement Deposits'\n" \
-            " WHEN pmgroupname LIKE '%Slide deposits%' THEN 'Mass Movement Deposits'\n" \
-            " WHEN pmgroupname LIKE '%Talus%' THEN 'Mass Movement Deposits'\n" \
-            " WHEN pmgroupname LIKE '%Topple deposits%' THEN 'Mass Movement Deposits'\n" \
-            " WHEN pmgroupname LIKE '%Diamicton%' THEN 'Miscellaneous Deposits'\n" \
-            " WHEN pmgroupname LIKE '%mixed%' THEN 'Miscellaneous Deposits'\n" \
-            " WHEN pmgroupname LIKE '%Coprogenic material%' THEN 'Organic Deposits'\n" \
-            " WHEN pmgroupname LIKE '%Grassy organic material%' THEN 'Organic Deposits'\n" \
-            " WHEN pmgroupname LIKE '%Herbaceous organic material%' THEN 'Organic Deposits'\n" \
-            " WHEN pmgroupname LIKE '%Mossy organic material%' THEN 'Organic Deposits'\n" \
-            " WHEN pmgroupname LIKE '%Organic material%' THEN 'Organic Deposits'\n" \
-            " WHEN pmgroupname LIKE '%Woody organic material%' THEN 'Organic Deposits'\n" \
-            " WHEN pmgroupname LIKE '%Acidic volcanic ash%' THEN 'Volcanic Deposits (unconsolidated; eolian and mass movement)'\n" \
-            " WHEN pmgroupname LIKE '%Andesitic volcanic ash%' THEN 'Volcanic Deposits (unconsolidated; eolian and mass movement)'\n" \
-            " WHEN pmgroupname LIKE '%Ash flow%' THEN 'Volcanic Deposits (unconsolidated; eolian and mass movement)'\n" \
-            " WHEN pmgroupname LIKE '%Basaltic volcanic ash%' THEN 'Volcanic Deposits (unconsolidated; eolian and mass movement)'\n" \
-            " WHEN pmgroupname LIKE '%Basic volcanic ash%' THEN 'Volcanic Deposits (unconsolidated; eolian and mass movement)'\n" \
-            " WHEN pmgroupname LIKE '%Cinders%' THEN 'Volcanic Deposits (unconsolidated; eolian and mass movement)'\n" \
-            " WHEN pmgroupname LIKE '%Lahar deposits%' THEN 'Volcanic Deposits (unconsolidated; eolian and mass movement)'\n" \
-            " WHEN pmgroupname LIKE '%Pumice%' THEN 'Volcanic Deposits (unconsolidated; eolian and mass movement)'\n" \
-            " WHEN pmgroupname LIKE '%Pyroclastic flow%' THEN 'Volcanic Deposits (unconsolidated; eolian and mass movement)'\n" \
-            " WHEN pmgroupname LIKE '%Pyroclastic surge%' THEN 'Volcanic Deposits (unconsolidated; eolian and mass movement)'\n" \
-            " WHEN pmgroupname LIKE '%Scoria%' THEN 'Volcanic Deposits (unconsolidated; eolian and mass movement)'\n" \
-            " WHEN pmgroupname LIKE '%Tephra%' THEN 'Volcanic Deposits (unconsolidated; eolian and mass movement)'\n" \
-            " WHEN pmgroupname LIKE '%tuff%' THEN 'Volcanic Deposits (unconsolidated; eolian and mass movement)'\n" \
-            " WHEN pmgroupname LIKE '%tuff-breccia%' THEN 'Volcanic Deposits (unconsolidated; eolian and mass movement)'\n" \
-            " WHEN pmgroupname LIKE '%Volcanic ash%' THEN 'Volcanic Deposits (unconsolidated; eolian and mass movement)'\n" \
-            " WHEN pmgroupname LIKE '%Alluvium%' THEN 'Waterlaid (or Transported) Deposits'\n" \
-            " WHEN pmgroupname LIKE '%Backswamp deposits%' THEN 'Waterlaid (or Transported) Deposits'\n" \
-            " WHEN pmgroupname LIKE '%Beach sand%' THEN 'Waterlaid (or Transported) Deposits'\n" \
-            " WHEN pmgroupname LIKE '%Diatomaceous earth%' THEN 'Waterlaid (or Transported) Deposits'\n" \
-            " WHEN pmgroupname LIKE '%Estuarine deposits%' THEN 'Waterlaid (or Transported) Deposits'\n" \
-            " WHEN pmgroupname LIKE '%Fluviomarine deposits%' THEN 'Waterlaid (or Transported) Deposits'\n" \
-            " WHEN pmgroupname LIKE '%Greensands%' THEN 'Waterlaid (or Transported) Deposits'\n" \
-            " WHEN pmgroupname LIKE '%Lacustrine deposits%' THEN 'Waterlaid (or Transported) Deposits'\n" \
-            " WHEN pmgroupname LIKE '%Lagoonal deposits%' THEN 'Waterlaid (or Transported) Deposits'\n" \
-            " WHEN pmgroupname LIKE '%Marine deposits%' THEN 'Waterlaid (or Transported) Deposits'\n" \
-            " WHEN pmgroupname LIKE '%Marl%' THEN 'Waterlaid (or Transported) Deposits'\n" \
-            " WHEN pmgroupname LIKE '%Overbank deposits%' THEN 'Waterlaid (or Transported) Deposits'\n" \
-            " WHEN pmgroupname LIKE '%Pedisediment%' THEN 'Waterlaid (or Transported) Deposits'\n" \
-            " WHEN pmgroupname LIKE '%Slope alluvium%' THEN 'Waterlaid (or Transported) Deposits'\n" \
-            " WHEN pmgroupname LIKE '%Valley side alluvium%' THEN 'Waterlaid (or Transported) Deposits'\n" \
-            " WHEN pmgroupname LIKE '%Coal extraction mine spoil%' THEN 'Anthropogenic Deposits'\n" \
-            " WHEN pmgroupname LIKE '%Dredge spoils%' THEN 'Anthropogenic Deposits'\n" \
-            " WHEN pmgroupname LIKE '%Human-transported material%' THEN 'Anthropogenic Deposits'\n" \
-            " WHEN pmgroupname LIKE '%Metal ore extraction mine spoil%' THEN 'Anthropogenic Deposits'\n" \
-            " WHEN pmgroupname LIKE '%Mine spoil or earthy fill%' THEN 'Anthropogenic Deposits'\n" \
-            " WHEN pmgroupname LIKE '%aa%' THEN 'Miscoded - should be pmorigin'\n" \
-            " WHEN pmgroupname LIKE '%breccia-basic%' THEN 'Miscoded - should be pmorigin'\n" \
-            " WHEN pmgroupname LIKE '%conglomerate%' THEN 'Miscoded - should be pmorigin'\n" \
-            " WHEN pmgroupname LIKE '%dolomite%' THEN 'Miscoded - should be pmorigin'\n" \
-            " WHEN pmgroupname LIKE '%igneous%' THEN 'Miscoded - should be pmorigin'\n" \
-            " WHEN pmgroupname LIKE '%limestone%' THEN 'Miscoded - should be pmorigin'\n" \
-            " WHEN pmgroupname LIKE '%limestone-shale%' THEN 'Miscoded - should be pmorigin'\n" \
-            " WHEN pmgroupname LIKE '%metamorphic%' THEN 'Miscoded - should be pmorigin'\n" \
-            " WHEN pmgroupname LIKE '%quartzite%' THEN 'Miscoded - should be pmorigin'\n" \
-            " WHEN pmgroupname LIKE '%sandstone%' THEN 'Miscoded - should be pmorigin'\n" \
-            " WHEN pmgroupname LIKE '%sedimentary%' THEN 'Miscoded - should be pmorigin'\n" \
-            " WHEN pmgroupname LIKE '%serpentine%' THEN 'Miscoded - should be pmorigin'\n" \
-            " WHEN pmgroupname LIKE '%shale%' THEN 'Miscoded - should be pmorigin'\n" \
-            " WHEN pmgroupname LIKE '%shale-calcareous%' THEN 'Miscoded - should be pmorigin'\n" \
-            " WHEN pmgroupname LIKE '%siltstone%' THEN 'Miscoded - should be pmorigin'\n" \
-            " WHEN pmgroupname LIKE '%NULL%' THEN 'NULL' ELSE 'NULL' END AS pmgroupname\n" \
-            " \n" \
-            " \n" \
-            " FROM sacatalog \n" \
-            " INNER JOIN legend  ON legend.areasymbol = sacatalog.areasymbol AND sacatalog.areasymbol = '" + areaSym + "'\n" \
-            " INNER JOIN mapunit  ON mapunit.lkey = legend.lkey\n" \
-            " INNER JOIN component AS c ON c.mukey = mapunit.mukey AND c.cokey =\n" \
-            " (SELECT TOP 1 c1.cokey FROM component AS c1 \n" \
-            " INNER JOIN mapunit AS mu1 ON c1.mukey=mu1.mukey AND c1.mukey=mapunit.mukey ORDER BY c1.comppct_r DESC, c1.cokey ) \n" \
-            " INNER JOIN copmgrp ON copmgrp.cokey=c.cokey\n"
+            pmQry = \
+            """SELECT
+             sacatalog.areasymbol AS areasymbol,
+             mapunit.mukey AS mukey,
+             mapunit.musym AS musym,
+             mapunit.muname AS muname,
+             compname,
+             comppct_r ,
+
+             CASE WHEN pmgroupname LIKE '%Calcareous loess%' THEN 'Eolian Deposits (nonvolcanic)'
+             WHEN pmgroupname LIKE '%Eolian deposits%' THEN 'Eolian Deposits (nonvolcanic)'
+             WHEN pmgroupname LIKE '%Eolian sands%' THEN 'Eolian Deposits (nonvolcanic)'
+             WHEN pmgroupname LIKE '%Loess%' THEN 'Eolian Deposits (nonvolcanic)'
+             WHEN pmgroupname LIKE '%Noncalcareous loess%' THEN 'Eolian Deposits (nonvolcanic)'
+             WHEN pmgroupname LIKE '%Ablation till%' THEN 'Glacial and Periglacial Deposits'
+             WHEN pmgroupname LIKE '%Basal till%' THEN 'Glacial and Periglacial Deposits'
+             WHEN pmgroupname LIKE '%Cryoturbate%' THEN 'Glacial and Periglacial Deposits'
+             WHEN pmgroupname LIKE '%Drift%' THEN 'Glacial and Periglacial Deposits'
+             WHEN pmgroupname LIKE '%Flow till%' THEN 'Glacial and Periglacial Deposits'
+             WHEN pmgroupname LIKE '%Glaciofluvial deposits%' THEN 'Glacial and Periglacial Deposits'
+             WHEN pmgroupname LIKE '%Glaciolacustrine deposits%' THEN 'Glacial and Periglacial Deposits'
+             WHEN pmgroupname LIKE '%Glaciomarine deposits%' THEN 'Glacial and Periglacial Deposits'
+             WHEN pmgroupname LIKE '%Lodgment till%' THEN 'Glacial and Periglacial Deposits'
+             WHEN pmgroupname LIKE '%Melt-out till%' THEN 'Glacial and Periglacial Deposits'
+             WHEN pmgroupname LIKE '%Outwash%' THEN 'Glacial and Periglacial Deposits'
+             WHEN pmgroupname LIKE '%Solifluction deposits%' THEN 'Glacial and Periglacial Deposits'
+             WHEN pmgroupname LIKE '%Subglacial till%' THEN 'Glacial and Periglacial Deposits'
+             WHEN pmgroupname LIKE '%Supraglacial meltout till%' THEN 'Glacial and Periglacial Deposits'
+             WHEN pmgroupname LIKE '%Supraglacial till%' THEN 'Glacial and Periglacial Deposits'
+             WHEN pmgroupname LIKE '%Till%' THEN 'Glacial and Periglacial Deposits'
+             WHEN pmgroupname LIKE '%Bauxite%' THEN 'In-Place Deposits (nontransported)'
+             WHEN pmgroupname LIKE '%Grus%' THEN 'In-Place Deposits (nontransported)'
+             WHEN pmgroupname LIKE '%Residuum%' THEN 'In-Place Deposits (nontransported)'
+             WHEN pmgroupname LIKE '%Saprolite%' THEN 'In-Place Deposits (nontransported)'
+             WHEN pmgroupname LIKE '%Colluvium%' THEN 'Mass Movement Deposits'
+             WHEN pmgroupname LIKE '%Complex landslide deposits%' THEN 'Mass Movement Deposits'
+             WHEN pmgroupname LIKE '%Creep deposits%' THEN 'Mass Movement Deposits'
+             WHEN pmgroupname LIKE '%Debris avalanche deposits%' THEN 'Mass Movement Deposits'
+             WHEN pmgroupname LIKE '%Debris flow deposits%' THEN 'Mass Movement Deposits'
+             WHEN pmgroupname LIKE '%Debris slide deposits%' THEN 'Mass Movement Deposits'
+             WHEN pmgroupname LIKE '%Debris spread deposits%' THEN 'Mass Movement Deposits'
+             WHEN pmgroupname LIKE '%Debris topple deposits%' THEN 'Mass Movement Deposits'
+             WHEN pmgroupname LIKE '%Earth spread deposits%' THEN 'Mass Movement Deposits'
+             WHEN pmgroupname LIKE '%Earthflow deposits%' THEN 'Mass Movement Deposits'
+             WHEN pmgroupname LIKE '%Flow deposits%' THEN 'Mass Movement Deposits'
+             WHEN pmgroupname LIKE '%Lateral spread deposits%' THEN 'Mass Movement Deposits'
+             WHEN pmgroupname LIKE '%Mass movement deposits%' THEN 'Mass Movement Deposits'
+             WHEN pmgroupname LIKE '%Mudflow deposits%' THEN 'Mass Movement Deposits'
+             WHEN pmgroupname LIKE '%Rock spread deposits%' THEN 'Mass Movement Deposits'
+             WHEN pmgroupname LIKE '%Rock topple deposits%' THEN 'Mass Movement Deposits'
+             WHEN pmgroupname LIKE '%Rockfall avalanche deposits%' THEN 'Mass Movement Deposits'
+             WHEN pmgroupname LIKE '%Rockfall deposits%' THEN 'Mass Movement Deposits'
+             WHEN pmgroupname LIKE '%Rotational earth slide deposits%' THEN 'Mass Movement Deposits'
+             WHEN pmgroupname LIKE '%Rotational slide deposits%' THEN 'Mass Movement Deposits'
+             WHEN pmgroupname LIKE '%Sand flow deposits%' THEN 'Mass Movement Deposits'
+             WHEN pmgroupname LIKE '%Scree%' THEN 'Mass Movement Deposits'
+             WHEN pmgroupname LIKE '%Slide deposits%' THEN 'Mass Movement Deposits'
+             WHEN pmgroupname LIKE '%Talus%' THEN 'Mass Movement Deposits'
+             WHEN pmgroupname LIKE '%Topple deposits%' THEN 'Mass Movement Deposits'
+             WHEN pmgroupname LIKE '%Diamicton%' THEN 'Miscellaneous Deposits'
+             WHEN pmgroupname LIKE '%mixed%' THEN 'Miscellaneous Deposits'
+             WHEN pmgroupname LIKE '%Coprogenic material%' THEN 'Organic Deposits'
+             WHEN pmgroupname LIKE '%Grassy organic material%' THEN 'Organic Deposits'
+             WHEN pmgroupname LIKE '%Herbaceous organic material%' THEN 'Organic Deposits'
+             WHEN pmgroupname LIKE '%Mossy organic material%' THEN 'Organic Deposits'
+             WHEN pmgroupname LIKE '%Organic material%' THEN 'Organic Deposits'
+             WHEN pmgroupname LIKE '%Woody organic material%' THEN 'Organic Deposits'
+             WHEN pmgroupname LIKE '%Acidic volcanic ash%' THEN 'Volcanic Deposits (unconsolidated; eolian and mass movement)'
+             WHEN pmgroupname LIKE '%Andesitic volcanic ash%' THEN 'Volcanic Deposits (unconsolidated; eolian and mass movement)'
+             WHEN pmgroupname LIKE '%Ash flow%' THEN 'Volcanic Deposits (unconsolidated; eolian and mass movement)'
+             WHEN pmgroupname LIKE '%Basaltic volcanic ash%' THEN 'Volcanic Deposits (unconsolidated; eolian and mass movement)'
+             WHEN pmgroupname LIKE '%Basic volcanic ash%' THEN 'Volcanic Deposits (unconsolidated; eolian and mass movement)'
+             WHEN pmgroupname LIKE '%Cinders%' THEN 'Volcanic Deposits (unconsolidated; eolian and mass movement)'
+             WHEN pmgroupname LIKE '%Lahar deposits%' THEN 'Volcanic Deposits (unconsolidated; eolian and mass movement)'
+             WHEN pmgroupname LIKE '%Pumice%' THEN 'Volcanic Deposits (unconsolidated; eolian and mass movement)'
+             WHEN pmgroupname LIKE '%Pyroclastic flow%' THEN 'Volcanic Deposits (unconsolidated; eolian and mass movement)'
+             WHEN pmgroupname LIKE '%Pyroclastic surge%' THEN 'Volcanic Deposits (unconsolidated; eolian and mass movement)'
+             WHEN pmgroupname LIKE '%Scoria%' THEN 'Volcanic Deposits (unconsolidated; eolian and mass movement)'
+             WHEN pmgroupname LIKE '%Tephra%' THEN 'Volcanic Deposits (unconsolidated; eolian and mass movement)'
+             WHEN pmgroupname LIKE '%tuff%' THEN 'Volcanic Deposits (unconsolidated; eolian and mass movement)'
+             WHEN pmgroupname LIKE '%tuff-breccia%' THEN 'Volcanic Deposits (unconsolidated; eolian and mass movement)'
+             WHEN pmgroupname LIKE '%Volcanic ash%' THEN 'Volcanic Deposits (unconsolidated; eolian and mass movement)'
+             WHEN pmgroupname LIKE '%Alluvium%' THEN 'Waterlaid (or Transported) Deposits'
+             WHEN pmgroupname LIKE '%Backswamp deposits%' THEN 'Waterlaid (or Transported) Deposits'
+             WHEN pmgroupname LIKE '%Beach sand%' THEN 'Waterlaid (or Transported) Deposits'
+             WHEN pmgroupname LIKE '%Diatomaceous earth%' THEN 'Waterlaid (or Transported) Deposits'
+             WHEN pmgroupname LIKE '%Estuarine deposits%' THEN 'Waterlaid (or Transported) Deposits'
+             WHEN pmgroupname LIKE '%Fluviomarine deposits%' THEN 'Waterlaid (or Transported) Deposits'
+             WHEN pmgroupname LIKE '%Greensands%' THEN 'Waterlaid (or Transported) Deposits'
+             WHEN pmgroupname LIKE '%Lacustrine deposits%' THEN 'Waterlaid (or Transported) Deposits'
+             WHEN pmgroupname LIKE '%Lagoonal deposits%' THEN 'Waterlaid (or Transported) Deposits'
+             WHEN pmgroupname LIKE '%Marine deposits%' THEN 'Waterlaid (or Transported) Deposits'
+             WHEN pmgroupname LIKE '%Marl%' THEN 'Waterlaid (or Transported) Deposits'
+             WHEN pmgroupname LIKE '%Overbank deposits%' THEN 'Waterlaid (or Transported) Deposits'
+             WHEN pmgroupname LIKE '%Pedisediment%' THEN 'Waterlaid (or Transported) Deposits'
+             WHEN pmgroupname LIKE '%Slope alluvium%' THEN 'Waterlaid (or Transported) Deposits'
+             WHEN pmgroupname LIKE '%Valley side alluvium%' THEN 'Waterlaid (or Transported) Deposits'
+             WHEN pmgroupname LIKE '%Coal extraction mine spoil%' THEN 'Anthropogenic Deposits'
+             WHEN pmgroupname LIKE '%Dredge spoils%' THEN 'Anthropogenic Deposits'
+             WHEN pmgroupname LIKE '%Human-transported material%' THEN 'Anthropogenic Deposits'
+             WHEN pmgroupname LIKE '%Metal ore extraction mine spoil%' THEN 'Anthropogenic Deposits'
+             WHEN pmgroupname LIKE '%Mine spoil or earthy fill%' THEN 'Anthropogenic Deposits'
+             WHEN pmgroupname LIKE '%aa%' THEN 'Miscoded - should be pmorigin'
+             WHEN pmgroupname LIKE '%breccia-basic%' THEN 'Miscoded - should be pmorigin'
+             WHEN pmgroupname LIKE '%conglomerate%' THEN 'Miscoded - should be pmorigin'
+             WHEN pmgroupname LIKE '%dolomite%' THEN 'Miscoded - should be pmorigin'
+             WHEN pmgroupname LIKE '%igneous%' THEN 'Miscoded - should be pmorigin'
+             WHEN pmgroupname LIKE '%limestone%' THEN 'Miscoded - should be pmorigin'
+             WHEN pmgroupname LIKE '%limestone-shale%' THEN 'Miscoded - should be pmorigin'
+             WHEN pmgroupname LIKE '%metamorphic%' THEN 'Miscoded - should be pmorigin'
+             WHEN pmgroupname LIKE '%quartzite%' THEN 'Miscoded - should be pmorigin'
+             WHEN pmgroupname LIKE '%sandstone%' THEN 'Miscoded - should be pmorigin'
+             WHEN pmgroupname LIKE '%sedimentary%' THEN 'Miscoded - should be pmorigin'
+             WHEN pmgroupname LIKE '%serpentine%' THEN 'Miscoded - should be pmorigin'
+             WHEN pmgroupname LIKE '%shale%' THEN 'Miscoded - should be pmorigin'
+             WHEN pmgroupname LIKE '%shale-calcareous%' THEN 'Miscoded - should be pmorigin'
+             WHEN pmgroupname LIKE '%siltstone%' THEN 'Miscoded - should be pmorigin'
+             WHEN pmgroupname LIKE '%NULL%' THEN 'NULL' ELSE 'NULL' END AS pmgroupname
+
+
+             FROM sacatalog
+             INNER JOIN legend  ON legend.areasymbol = sacatalog.areasymbol AND sacatalog.areasymbol = '""" + areaSym + """'
+             INNER JOIN mapunit  ON mapunit.lkey = legend.lkey
+             INNER JOIN component AS c ON c.mukey = mapunit.mukey AND c.cokey =
+             (SELECT TOP 1 c1.cokey FROM component AS c1
+             INNER JOIN mapunit AS mu1 ON c1.mukey=mu1.mukey AND c1.mukey=mapunit.mukey ORDER BY c1.comppct_r DESC, c1.cokey )
+             INNER JOIN copmgrp ON copmgrp.cokey=c.cokey"""
 
         else:
 
-            pmQry = "SELECT \n" \
-            " sacatalog.areasymbol AS areasymbol, \n" \
-            " mapunit.mukey AS mukey, \n" \
-            " mapunit.musym AS musym,\n" \
-            " mapunit.muname AS muname,\n" \
-            " compname,\n" \
-            " comppct_r,\n" \
-            " pmgroupname" \
-            " \n" \
-            " FROM sacatalog \n" \
-            " INNER JOIN legend  ON legend.areasymbol = sacatalog.areasymbol AND sacatalog.areasymbol = '" + areaSym + "'\n" \
-            " INNER JOIN mapunit  ON mapunit.lkey = legend.lkey\n" \
-            " INNER JOIN component AS c ON c.mukey = mapunit.mukey AND c.cokey =\n" \
-            " (SELECT TOP 1 c1.cokey FROM component AS c1 \n" \
-            " INNER JOIN mapunit AS mu1 ON c1.mukey=mu1.mukey AND c1.mukey=mapunit.mukey ORDER BY c1.comppct_r DESC, c1.cokey ) \n" \
-            " INNER JOIN copmgrp ON copmgrp.cokey=c.cokey"
+            pmQry = """SELECT
+             sacatalog.areasymbol AS areasymbol,
+             mapunit.mukey AS mukey,
+             mapunit.musym AS musym,
+             mapunit.muname AS muname,
+             compname,
+             comppct_r,
+             pmgroupname
+
+             FROM sacatalog
+             INNER JOIN legend  ON legend.areasymbol = sacatalog.areasymbol AND sacatalog.areasymbol = '""" + areaSym + """'
+             INNER JOIN mapunit  ON mapunit.lkey = legend.lkey
+             INNER JOIN component AS c ON c.mukey = mapunit.mukey AND c.cokey =
+             (SELECT TOP 1 c1.cokey FROM component AS c1
+             INNER JOIN mapunit AS mu1 ON c1.mukey=mu1.mukey AND c1.mukey=mapunit.mukey ORDER BY c1.comppct_r DESC, c1.cokey )
+             INNER JOIN copmgrp ON copmgrp.cokey=c.cokey"""
 
 
         #arcpy.AddMessage(pmQry)
+        theURL = "https://sdmdataaccess.nrcs.usda.gov"
+        url = theURL + "/Tabular/SDMTabularService/post.rest"
 
-        #send the soap request
-        sXML = """<?xml version="1.0" encoding="utf-8"?>
-                <soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
-                <soap12:Body>
-                <RunQuery xmlns="http://SDMDataAccess.nrcs.usda.gov/Tabular/SDMTabularService.asmx">
-                  <Query>""" + pmQry + """</Query>
-                </RunQuery>
-                </soap12:Body>
-                </soap12:Envelope>"""
+        # Create request using JSON, return data as JSON
+        request = {}
+        request["FORMAT"] = "JSON"
+        request["QUERY"] = pmQry
 
-        dHeaders = dict()
-        dHeaders["Host"      ] = "sdmdataaccess.nrcs.usda.gov"
-        #dHeaders["User-Agent"] = "NuSOAP/0.7.3 (1.114)"
-        #dHeaders["Content-Type"] = "application/soap+xml; charset=utf-8"
-        dHeaders["Content-Type"] = "text/xml; charset=utf-8"
-        dHeaders["SOAPAction"] = "http://SDMDataAccess.nrcs.usda.gov/Tabular/SDMTabularService.asmx/RunQuery"
-        dHeaders["Content-Length"] = len(sXML)
-        sURL = "SDMDataAccess.nrcs.usda.gov"
+        #json.dumps = serialize obj (request dictionary) to a JSON formatted str
+        data = json.dumps(request)
 
-        # Create SDM connection to service using HTTP
-        conn = httplib.HTTPConnection(sURL, 80)
+        # Send request to SDA Tabular service using urllib2 library
+        # because we are passing the "data" argument, this is a POST request, not a GET
+        req = urllib2.Request(url, data)
+        response = urllib2.urlopen(req)
 
-        # Send request in XML-Soap
-        conn.request("POST", "/Tabular/SDMTabularService.asmx", sXML, dHeaders)
+        #get http response code and decode
+        code = response.getcode()
+        cResponse = bhrh.responses.get(code)
+        cResponse = "{}; {}".format(cResponse[0], cResponse[1])
 
-        # Get back XML response
-        response = conn.getresponse()
+        # read query results
+        qResults = response.read()
 
-        cStatus = response.status
-        cResponse = response.reason
+        # Convert the returned JSON string into a Python dictionary.
+        qData = json.loads(qResults)
+        #print qData
 
-        #AddMsgAndPrint(str(cStatus) + ": " + cResponse)
 
-        xmlString = response.read()
+        # get rid of objects
+        del qResults, response, req
 
-        # Close connection to SDM
-        conn.close()
 
-        # Convert XML to tree format
-        root = ET.fromstring(xmlString)
+        # if dictionary key "Table" is found
+        if "Table" in qData:
 
-        for child in root.iter('Table'):
+            # get its value
+            # a list of lists
+            resLst = qData["Table"]
 
-            #create a list to accumulate values for each mapunit
-            hldrLst = list()
+            #for each list in the list
+            for res in resLst:
 
-            #loop thru the ordered list and get corresponding value from xml
-            #and add it to list
-            for eFld in ordLst:
-                eRes = child.find(eFld).text
-                if str(eRes):
-                    eRes = eRes
-                else:
-                    eRes = None
+                #insert integer copy of mukey into list at position 3
+                res.insert(2, int(res[1]))
 
-                hldrLst.append(eRes)
 
-            #get interger mukey into the list
-            hldrLst.insert(2, int(hldrLst[1]))
-            #arcpy.AddMessage(hldrLst)
-
-            #put the list for each mapunit into a dictionary.  dict keys are mukeys.
-            funcDict[hldrLst[1]]= hldrLst
+                #put the list for each mapunit into a dictionary.  dict keys are mukeys.
+                funcDict[res[1]] = res
 
         return True, funcDict, cResponse
 
@@ -299,8 +286,8 @@ def getPMgrp(areaSym, ordLst, dBool):
 
 #===============================================================================
 
-import arcpy, sys, os, traceback, time, httplib
-import xml.etree.cElementTree as ET
+import arcpy, sys, os, traceback, time, httplib, urllib2, json
+#import xml.etree.cElementTree as ET
 
 arcpy.env.overwriteOutput = True
 
