@@ -662,6 +662,8 @@ def sym(inLyr):
     for l in lyrs:
         if l.name == srcStr:
 
+            l.name = name[19:]
+
             valFld = name + tblExt + '.'+ propVal
             if valFld in [x.name for x in arcpy.Describe(l).fields]:
 
@@ -682,7 +684,7 @@ def sym(inLyr):
                         #if it's a string
                         else:
                             if row[0] is None:
-                                aVal = ' Not Rated'
+                                aVal = 'Not Rated'
                             else:
                                 aVal = row[0]
 

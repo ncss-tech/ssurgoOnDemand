@@ -525,6 +525,9 @@ def mkLyr():
     lyrs = arcpy.mapping.ListLayers(mxd, "*", df)
     for l in lyrs:
         if l.name == srcStr:
+
+            l.name = name[19:]
+
             valFld = name + tblExt + '.rating'
             #arcpy.AddMessage(l.name)
             if valFld in [x.name for x in arcpy.Describe(l).fields]:
@@ -534,14 +537,17 @@ def mkLyr():
                 values = list()
                 with arcpy.da.SearchCursor(l.name, valFld) as rows:
                     for row in rows:
-                        #aVal = row[0]
-                        try:
-                            aVal = round(row[0], 3)
-                        except:
-                            aVal = aVal
 
-                        if not aVal in values:
-                            values.append(aVal)
+                        #test to see if rating has a value
+                        if not row[0] == None:
+
+                            try:
+                                aVal = round(row[0], 3)
+                            except:
+                                aVal = aVal
+
+                            if not aVal in values:
+                                values.append(aVal)
                 values.sort()
 
 
