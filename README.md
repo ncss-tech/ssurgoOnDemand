@@ -6,15 +6,16 @@ The purpose of these tools are to give users the ability to get Soil Survey Geog
 
 Within the SOD tools are 2 primary toolsets, descibed as follows:
 
-<H1>Areasymbol</H1>
+<H1>1. Areasymbol</H1>
 The Areasymbol tools collect SSURGO properties and interpretations based on a user supplied list of Soil Survey areasymbols (e.g. NC123).  After the areasymbols have been collected, an aggregation method (see below) is selected .  THe aggregation method has no affect on interpretations other than how the SSURGO data aggregated.  For soil properties, the aggregation method drives what properties can be run.  For example, you can't run the weighted average aggregation method on Taxonomic Order. Similarly, for the same soil property, you wouldn't specify a depth range.  The point here is the aggregation method affects what parameters need to be supplied for the SQL generation.  It is important to note the user can specify any number of areasymbols and any number of interpretations.  This is another distinct advantage of these tools.  For example, you could collect all of the SSURGO interpretations for every soil survey area (areasymbol) by executing the tool 1 time.  This also demonstrates the flexibility SOD has in defining the geographic extent, the only constraint is the extent of soil survey areas selected (and these can be discontinuous).  
  
  As SOD Areasymbol tools execute, 2 lists are collected from the tool dialog, a list of interpretations/properties and a list of areasymbols.  As each interpretation/property is run, every areasymbols is run against the interpretation/property.  For instance, suppose you wanted to collect the weighted average of sand, silt and clay for 5 soil survey areas.  The sand property would run for all 5 soil survey areas and built into a table.  Next the silt would run for all 5 soil survey areas and built into a table, and so on.  In this example a total of 15 web request would have been sent and 3 tables are built.  Two VERY IMPORTANT things here... 
  
  1). All the areasymbol tools do is make tables.  They are not collecting spatial data.
+ 
  2). They are collecting stored information.  They are not making calculations(with the exception of the weighted average aggregation method).
 
-<H1>Express</H1>
+<H1>2. Express</H1>
 The Express toolset is nearly identical to the Areasymbol toolset, with 2 exceptions.
 
 1.)The area to collect SSURGO information for is defined by the user.  The user digitizes coordinates into a 'feature set' after the tool is open. The points in the feature set are closed (first point is also the last) into a polygon.  The polygon is sent to Soil Data Access and the features set points (polygon) are used to clip SSURGO spatial data.  The geomotries of the clip operation are returned, along with the mapunit keys (unique identifier). It is best to keep the points in the feature set simple and beware of self intersections as they are fatal.
@@ -25,7 +26,8 @@ The properties and interpretations options are identical to what was discussed f
 
 The Express tools present the user the option of creating layer files (.lyr) where the the resultant interpretation/property are joined to the geometry.  Additionally, for soil properties, an option exists to append all of the selected soil properties to a single table.  In this case, if the user ran sand, silt, and clay properties, instead of 3 output tables, there is only 1 table with a sand column, a silt column, and a clay column.
 
-<H1>Aggregation Method</H1>
+<H1>Supplemental Information</H1>
+<H3>Aggregation Method</H3>
 Aggregation is the process by which a set of component attribute values is reduced to a single value to represent the map unit as a whole.
 
 A map unit is typically composed of one or more "components". A component is either some type of soil or some nonsoil entity, e.g., rock outcrop. The components in the map unit name represent the major soils within a map unit delineation. Minor components make up the balance of the map unit. Great differences in soil properties can occur between map unit components and within short distances. Minor components may be very different from the major components. Such differences could significantly affect use and management of the map unit. Minor components may or may not be documented in the database. The results of aggregation do not reflect the presence or absence of limitations of the components which are not listed in the database. An on-site investigation is required to identify the location of individual map unit components. For queries of soil properties, only major components are considered for Dominant Component (numeric) and Weighted Average aggregation methods (see below). Additionally, the aggregation method selected drives the available properties to be queried. For queries of soil interpretations, all components are condisered.
