@@ -4,7 +4,7 @@ user driven SSURGO properties and interpretations
 <b>*DISCLAIMER* <i>The information returned by the SSURO On-Demand tools are provided "as is".  Additionally, there is no expressed or implied accuracy of the data returned.  Use at your own risk.</i> </b>
 
 
-The purpose of these tools are to give users the ability to get Soil Survey Geographic Database (SSURGO) properties and interpretations in an efficient manner.  They are very similiar to the United States Department of Agriculture  - Natural Resource Conservation Service's distributed Soil Data Viewer (SDV), although there are distinct differences.  The most importatn difference is the data collected with the SSURGO On-Demand (SOD) tools are collecting the information in real-time via web requests to Soil Data Access (https://sdmdataaccess.nrcs.usda.gov/).  SOD tools do not require users to have the data found in a traditional SSURGO download from the NRCS's official repository, Web Soil Survey (https://websoilsurvey.sc.egov.usda.gov/App/HomePage.htm).  The main intent of both SOD and SDV are to hide the complex relationships of the National Soil Information System (NASIS) databse tables and allow the users to focus on asking the question they need to get the information they want.  This is acconplished in the user interface of the tools and the subsequent SQL is built and executed for the user. Currently, the tools packaged here are designed to run within the ESRI ArcGIS Desktop Application - ArcMap, version 10.1 or greater.  However, much of the Python code is recyclable and could run within a Python intepreter or other GIS applicaations such as Quantum GIS with some modification.
+The purpose of these tools are to give users the ability to get Soil Survey Geographic Database (SSURGO) properties and interpretations in an efficient manner.  They are very similiar to the United States Department of Agriculture  - Natural Resource Conservation Service's distributed Soil Data Viewer (SDV), although there are distinct differences.  The most important difference is the data collected with the SSURGO On-Demand (SOD) tools are collecting the information in real-time via web requests to Soil Data Access (https://sdmdataaccess.nrcs.usda.gov/).  SOD tools do not require users to have the data found in a traditional SSURGO download from the NRCS's official repository, Web Soil Survey (https://websoilsurvey.sc.egov.usda.gov/App/HomePage.htm).  The main intent of both SOD and SDV are to hide the complex relationships of the National Soil Information System (NASIS) databse tables and allow the users to focus on asking the question they need to get the information they want.  This is acconplished in the user interface of the tools and the subsequent SQL is built and executed for the user. Currently, the tools packaged here are designed to run within the ESRI ArcGIS Desktop Application - ArcMap, version 10.1 or greater.  However, much of the Python code is recyclable and could run within a Python intepreter or other GIS applicaations such as Quantum GIS with some modification.
 
 Within the SOD tools are 2 primary toolsets, descibed as follows:
 
@@ -13,16 +13,16 @@ The Areasymbol tools collect SSURGO properties and interpretations based on a us
  
  As SOD Areasymbol tools execute, 2 lists are collected from the tool dialog, a list of interpretations/properties and a list of areasymbols.  As each interpretation/property is run, every areasymbols is run against the interpretation/property.  For instance, suppose you wanted to collect the weighted average of sand, silt and clay for 5 soil survey areas.  The sand property would run for all 5 soil survey areas and built into a table.  Next the silt would run for all 5 soil survey areas and built into a table, and so on.  In this example a total of 15 web request would have been sent and 3 tables are built.  Two VERY IMPORTANT things here... 
  
- 1). All the areasymbol tools do is make tables.  They are not collecting spatial data.
+ A. All the areasymbol tools do is make tables.  They are not collecting spatial data.
  
- 2). They are collecting stored information.  They are not making calculations(with the exception of the weighted average aggregation method).
+ B. They are collecting stored information.  They are not making calculations(with the exception of the weighted average aggregation method).
 
 <H1>2. Express</H1>
 The Express toolset is nearly identical to the Areasymbol toolset, with 2 exceptions.
 
-1.)The area to collect SSURGO information for is defined by the user.  The user digitizes coordinates into a 'feature set' after the tool is open. The points in the feature set are closed (first point is also the last) into a polygon.  The polygon is sent to Soil Data Access and the features set points (polygon) are used to clip SSURGO spatial data.  The geomotries of the clip operation are returned, along with the mapunit keys (unique identifier). It is best to keep the points in the feature set simple and beware of self intersections as they are fatal.
+A. The area to collect SSURGO information for is defined by the user.  The user digitizes coordinates into a 'feature set' after the tool is open. The points in the feature set are closed (first point is also the last) into a polygon.  The polygon is sent to Soil Data Access and the features set points (polygon) are used to clip SSURGO spatial data.  The geomotries of the clip operation are returned, along with the mapunit keys (unique identifier). It is best to keep the points in the feature set simple and beware of self intersections as they are fatal.
 
-2.)Instead of running on a list of areasymbols, the SQL queries on a list of mapunit keys.
+B. Instead of running on a list of areasymbols, the SQL queries on a list of mapunit keys.
 
 The properties and interpretations options are identical to what was discussed for the Areasymbol toolset.
 
