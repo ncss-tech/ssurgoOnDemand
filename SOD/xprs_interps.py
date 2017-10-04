@@ -7,6 +7,8 @@
 # Created:     19/07/2016
 # Copyright:   (c) Charles.Ferguson 2016
 # Licence:     <your licence>
+
+# 2017/10/04 JSON FORMAT to format and QUERY to query
 #-------------------------------------------------------------------------------
 
 class ForceExit(Exception):
@@ -60,21 +62,32 @@ def geoRequest(aoi):
         arcpy.management.CreateFeatureclass(outLoc, "SSURGO_express_interpretations" + geoExt, "POLYGON", None, None, None, sr)
         arcpy.management.AddField(outLoc + os.sep + "SSURGO_express_interpretations" + geoExt, "mukey", "TEXT", None, None, "30")
 
-        gQry = """ --   Define a AOI in WGS84
-        ~DeclareGeometry(@aoi)~
-        select @aoi = geometry::STPolyFromText('polygon(( """ + aoi + """))', 4326)\n
+##        gQry = """ --   Define a AOI in WGS84
+##        ~DeclareGeometry(@aoi)~
+##        select @aoi = geometry::STPolyFromText('polygon(( """ + aoi + """))', 4326)\n
+##
+##        --   Extract all intersected polygons
+##        ~DeclareIdGeomTable(@intersectedPolygonGeometries)~
+##        ~GetClippedMapunits(@aoi,polygon,geo,@intersectedPolygonGeometries)~
+##
+##        --   Convert geometries to geographies so we can get areas
+##        ~DeclareIdGeogTable(@intersectedPolygonGeographies)~
+##        ~GetGeogFromGeomWgs84(@intersectedPolygonGeometries,@intersectedPolygonGeographies)~
+##
+##        --   Return the polygonal geometries
+##        select * from @intersectedPolygonGeographies
+##        where geog.STGeometryType() = 'Polygon'"""
 
-        --   Extract all intersected polygons
+        gQry = """~DeclareGeometry(@aoi)~
+        select @aoi = geometry::STPolyFromText('POLYGON (( """ + aoi + """))', 4326)\n
+
+        -- Extract all intersected polygons
         ~DeclareIdGeomTable(@intersectedPolygonGeometries)~
         ~GetClippedMapunits(@aoi,polygon,geo,@intersectedPolygonGeometries)~
 
-        --   Convert geometries to geographies so we can get areas
-        ~DeclareIdGeogTable(@intersectedPolygonGeographies)~
-        ~GetGeogFromGeomWgs84(@intersectedPolygonGeometries,@intersectedPolygonGeographies)~
-
-        --   Return the polygonal geometries
-        select * from @intersectedPolygonGeographies
-        where geog.STGeometryType() = 'Polygon'"""
+        -- Return WKT for the polygonal geometries
+        select * from @intersectedPolygonGeometries
+        where geom.STGeometryType() = 'Polygon'"""
 
         #uncomment next line to print geoquery
         #arcpy.AddMessage(gQry)
@@ -85,8 +98,8 @@ def geoRequest(aoi):
 
         # Create request using JSON, return data as JSON
         request = {}
-        request["FORMAT"] = "JSON"
-        request["QUERY"] = gQry
+        request["format"] = "JSON"
+        request["query"] = gQry
 
         #json.dumps = serialize obj (request dictionary) to a JSON formatted str
         data = json.dumps(request)
@@ -288,8 +301,8 @@ def tabRequest(interp):
 
         # Create request using JSON, return data as JSON
         request = {}
-        request["FORMAT"] = "JSON"
-        request["QUERY"] = iQry
+        request["format"] = "JSON"
+        request["query"] = iQry
 
         #json.dumps = serialize obj (request dictionary) to a JSON formatted str
         data = json.dumps(request)
@@ -558,8 +571,8 @@ def mkLyr():
                 l.symbology.classDescriptions = values
                 l.symbology.ShowOtherValues = False
 
-                arcpy.RefreshActiveView()
-                arcpy.RefreshTOC()
+                #arcpy.RefreshActiveView()
+                #arcpy.RefreshTOC()
 
                 del values
 

@@ -241,8 +241,8 @@ def getProps(aProp, areaSym, aggMethod, tDep, bDep, mmC):
 
         # Create request using JSON, return data as JSON
         request = {}
-        request["FORMAT"] = "JSON"
-        request["QUERY"] = propQry
+        request["format"] = "JSON"
+        request["query"] = propQry
 
         #json.dumps = serialize obj (request dictionary) to a JSON formatted str
         data = json.dumps(request)

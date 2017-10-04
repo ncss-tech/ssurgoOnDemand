@@ -240,8 +240,8 @@ def getIntrps(interp, areaSym, aggMethod):
 
         # Create request using JSON, return data as JSON
         request = {}
-        request["FORMAT"] = "JSON"
-        request["QUERY"] = interpQry
+        request["format"] = "JSON"
+        request["query"] = interpQry
 
         #json.dumps = serialize obj (request dictionary) to a JSON formatted str
         data = json.dumps(request)
