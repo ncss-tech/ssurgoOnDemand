@@ -77,34 +77,48 @@ def geoRequest(aoi):
         arcpy.management.CreateFeatureclass(outLoc, "SSURGO_express_properties" + geoExt, "POLYGON", None, None, None, sr)
         arcpy.management.AddField(outLoc + os.sep + "SSURGO_express_properties" + geoExt, "mukey", "TEXT", None, None, "30")
 
-        gQry = """ --   Define a AOI in WGS84
-        ~DeclareGeometry(@aoi)~
-        select @aoi = geometry::STPolyFromText('polygon(( """ + aoi + """))', 4326)\n
+##        gQry = """ --   Define a AOI in WGS84
+##        ~DeclareGeometry(@aoi)~
+##        select @aoi = geometry::STPolyFromText('polygon(( """ + aoi + """))', 4326)\n
+##
+##        --   Extract all intersected polygons
+##        ~DeclareIdGeomTable(@intersectedPolygonGeometries)~
+##        ~GetClippedMapunits(@aoi,polygon,geo,@intersectedPolygonGeometries)~
+##
+##        --   Convert geometries to geographies so we can get areas
+##        ~DeclareIdGeogTable(@intersectedPolygonGeographies)~
+##        ~GetGeogFromGeomWgs84(@intersectedPolygonGeometries,@intersectedPolygonGeographies)~
+##
+##        --   Return the polygonal geometries
+##        select * from intersectedPolygonGeometries
+##        where geog.STGeometryType() = 'Polygon'"""
 
-        --   Extract all intersected polygons
+
+        gQry = """~DeclareGeometry(@aoi)~
+        select @aoi = geometry::STPolyFromText('POLYGON (( """ + aoi + """))', 4326)\n
+
+        -- Extract all intersected polygons
         ~DeclareIdGeomTable(@intersectedPolygonGeometries)~
         ~GetClippedMapunits(@aoi,polygon,geo,@intersectedPolygonGeometries)~
 
-        --   Convert geometries to geographies so we can get areas
-        ~DeclareIdGeogTable(@intersectedPolygonGeographies)~
-        ~GetGeogFromGeomWgs84(@intersectedPolygonGeometries,@intersectedPolygonGeographies)~
+        -- Return WKT for the polygonal geometries
+        select * from @intersectedPolygonGeometries
+        where geom.STGeometryType() = 'Polygon'"""
 
-        --   Return the polygonal geometries
-        select * from @intersectedPolygonGeographies
-        where geog.STGeometryType() = 'Polygon'"""
 
         #uncomment next line to print geoquery
         #arcpy.AddMessage(gQry)
 
-        theURL = "https://sdmdataaccess.nrcs.usda.gov"
-        url = theURL + "/Tabular/SDMTabularService/post.rest"
+        #theURL = "https://sdmdataaccess.nrcs.usda.gov"
+        #url = theURL + "/Tabular/SDMTabularService/post.rest"
+        url = "https://SDMDataAccess.sc.egov.usda.gov/Tabular/post.rest"
 
         arcpy.AddMessage('Sending coordinates to Soil Data Access...\n')
 
         # Create request using JSON, return data as JSON
         request = {}
-        request["FORMAT"] = "JSON"
-        request["QUERY"] = gQry
+        request["format"] = "JSON"
+        request["query"] = gQry
 
         #json.dumps = serialize obj (request dictionary) to a JSON formatted str
         data = json.dumps(request)
@@ -348,13 +362,14 @@ def tabRequest(aProp):
         #uncomment next line to print interp query to console
         #arcpy.AddMessage(pQry.replace("&gt;", ">").replace("&lt;", "<"))
 
-        theURL = "https://sdmdataaccess.nrcs.usda.gov"
-        url = theURL + "/Tabular/SDMTabularService/post.rest"
+        #theURL = "https://sdmdataaccess.nrcs.usda.gov"
+        #url = theURL + "/Tabular/SDMTabularService/post.rest"
+        url = r'https://SDMDataAccess.sc.egov.usda.gov/Tabular/post.rest'
 
         # Create request using JSON, return data as JSON
         request = {}
-        request["FORMAT"] = "JSON"
-        request["QUERY"] = pQry
+        request["format"] = "JSON"
+        request["query"] = pQry
 
         #json.dumps = serialize obj (request dictionary) to a JSON formatted str
         data = json.dumps(request)
@@ -719,7 +734,7 @@ arcpy.env.overwriteOutput = True
 arcpy.AddMessage('\n\n')
 
 featSet = arcpy.GetParameterAsText(0)
-#arcpy.AddMessage(featSet + '\n\n')
+arcpy.AddMessage(featSet + '\n\n')
 
 
 aggMethod = arcpy.GetParameterAsText(1)

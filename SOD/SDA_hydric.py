@@ -120,13 +120,14 @@ def getHyd(areaSym):
         #print hydQry.replace("&gt;", ">").replace("&lt;", "<")
         hydQry = hydQry.replace("&gt;", ">").replace("&lt;", "<")
 
-        theURL = "https://sdmdataaccess.nrcs.usda.gov"
-        url = theURL + "/Tabular/SDMTabularService/post.rest"
+        #theURL = "https://sdmdataaccess.nrcs.usda.gov"
+        #url = theURL + "/Tabular/SDMTabularService/post.rest"
+        url = r'https://SDMDataAccess.sc.egov.usda.gov/Tabular/post.rest'
 
         # Create request using JSON, return data as JSON
         request = {}
-        request["FORMAT"] = "JSON"
-        request["QUERY"] = hydQry
+        request["format"] = "JSON"
+        request["query"] = hydQry
 
         #json.dumps = serialize obj (request dictionary) to a JSON formatted str
         data = json.dumps(request)
