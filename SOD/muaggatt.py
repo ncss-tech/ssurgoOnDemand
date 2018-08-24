@@ -54,12 +54,71 @@ def errorMsg():
     except:
         PrintMsg("Unhandled error in errorMsg method", 2)
         pass
+def CreateNewTable(newTable, columnNames, columnInfo):
+    # Create new table. Start with in-memory and then export to geodatabase table
+    #
+    # ColumnNames and columnInfo come from the Attribute query JSON string
+    # MUKEY would normally be included in the list, but it should already exist in the output featureclass
+    #
+    try:
+        # Dictionary: SQL Server to FGDB
+        dType = dict()
 
-def getMuaggatt(aSym, ordLst):
+        dType["int"] = "long"
+        dType["smallint"] = "short"
+        dType["bit"] = "short"
+        dType["varbinary"] = "blob"
+        dType["nvarchar"] = "text"
+        dType["varchar"] = "text"
+        dType["char"] = "text"
+        dType["datetime"] = "date"
+        dType["datetime2"] = "date"
+        dType["smalldatetime"] = "date"
+        dType["decimal"] = "double"
+        dType["numeric"] = "double"
+        dType["float"] = "double"
+
+        # numeric type conversion depends upon the precision and scale
+        dType["numeric"] = "float"  # 4 bytes
+        dType["real"] = "double"  # 8 bytes
+
+        # Iterate through list of field names and add them to the output table
+        i = 0
+
+        # ColumnInfo contains:
+        # ColumnOrdinal, ColumnSize, NumericPrecision, NumericScale, ProviderType, IsLong, ProviderSpecificDataType, DataTypeName
+        # PrintMsg(" \nFieldName, Length, Precision, Scale, Type", 1)
+
+        joinFields = list()
+        outputTbl = os.path.join("IN_MEMORY", os.path.basename(newTable))
+        arcpy.CreateTable_management(os.path.dirname(outputTbl), os.path.basename(outputTbl))
+
+        for i, fldName in enumerate(columnNames):
+            vals = columnInfo[i].split(",")
+            length = int(vals[1].split("=")[1])
+            precision = int(vals[2].split("=")[1])
+            scale = int(vals[3].split("=")[1])
+            dataType = dType[vals[4].lower().split("=")[1]]
+
+            if fldName.lower().endswith("key"):
+                # Per SSURGO standards, key fields should be string. They come from Soil Data Access as long integer.
+                dataType = 'text'
+                length = 30
+
+            arcpy.AddField_management(outputTbl, fldName, dataType, precision, scale, length)
+
+        return outputTbl
+
+    except:
+        errorMsg()
+    return False
+
+
+def getMuaggatt(aSym):
 
     import socket
-
-    funcDict = dict()
+    from urllib2 import HTTPError, URLError
+    # funcDict = dict()
 
     try:
 
@@ -72,8 +131,6 @@ def getMuaggatt(aSym, ordLst):
         INNER JOIN muaggatt ma ON mapunit.mukey=ma.mukey
         WHERE areasymbol = '""" + aSym + """'"""
 
-        print muaggatQry
-
         #theURL = "https://sdmdataaccess.nrcs.usda.gov"
         #url = theURL + "/Tabular/SDMTabularService/post.rest"
 
@@ -81,7 +138,7 @@ def getMuaggatt(aSym, ordLst):
 
         # Create request using JSON, return data as JSON
         request = {}
-        request["format"] = "JSON"
+        request["format"] = "JSON+COLUMNNAME+METADATA"
         request["query"] = muaggatQry
 
         #json.dumps = serialize obj (request dictionary) to a JSON formatted str
@@ -108,79 +165,35 @@ def getMuaggatt(aSym, ordLst):
         # get rid of objects
         del qResults, response, req
 
-
         # if dictionary key "Table" is found
         if "Table" in qData:
 
+            return True, qData, cResponse
 
-            # get its value
-            # a list of lists
-            resLst = qData["Table"]
-
-         #containers
-
-            #the ordLst is the order of the list returned from SDA.  This allows us to step through each returned list/row
-            #and convert to appropriate data type
-            ordLst = ['musym', 'muname', 'mustatus', 'slopegraddcp', 'slopegradwta', 'brockdepmin', 'wtdepannmin', 'wtdepaprjunmin', 'flodfreqdcd', 'flodfreqmax', 'pondfreqprs', 'aws025wta', 'aws050wta', 'aws0100wta', 'aws0150wta', 'drclassdcd', 'drclasswettest', 'hydgrpdcd', 'iccdcd', 'iccdcdpct', 'niccdcd', 'niccdcdpct', 'engdwobdcd', 'engdwbdcd', 'engdwbll', 'engdwbml', 'engstafdcd', 'engstafll', 'engstafml', 'engsldcd', 'engsldcp', 'englrsdcd', 'engcmssdcd', 'engcmssmp', 'urbrecptdcd', 'urbrecptwta', 'forpehrtdcp', 'hydclprs', 'awmmfpwwta', 'mukey']
-            fltFlds = ['slopegraddcp', 'slopegradwta', 'aws025wta', 'aws050wta', 'aws0100wta', 'aws0150wta', 'urbrecptwta', 'awmmfpwwta']
-            strFlds = ['musym', 'muname', 'mustatus', 'flodfreqdcd', 'flodfreqmax', 'pondfreqprs', 'drclassdcd', 'drclasswettest', 'hydgrpdcd', 'iccdcd', 'niccdcd', 'engdwobdcd', 'engdwbdcd', 'engdwbll', 'engdwbml', 'engstafdcd', 'engstafll', 'engstafml', 'engsldcd', 'engsldcp', 'englrsdcd', 'engcmssdcd', 'engcmssmp', 'urbrecptdcd', 'forpehrtdcp', 'hydclprs', 'mukey']
-            intFlds = ['brockdepmin', 'wtdepannmin', 'wtdepaprjunmin', 'iccdcdpct', 'niccdcdpct']
-
-
-
-            for tblRow in resLst:
-                convertedList = list()
-                position = 0
-
-                # element corresponds to field
-                # for field in the row
-                for element in tblRow:
-
-                    # get the field name coresponding to position in ordLst
-                    eleName = ordLst[position]
-
-                    if eleName in strFlds:
-                            if str(element):
-                                element = element
-                            else:
-                                element = None
-
-                    if eleName in fltFlds:
-                        try:
-                            element = float(element)
-                        except:
-                            element = None
-
-                    if eleName in intFlds:
-                        try:
-                            element = int(element)
-                        except:
-                            element = None
-
-                    convertedList.append(element)
-                    position+=1
-
-
-
-                #put the list for each mapunit into a dictionary.  dict keys are mukeys.
-                funcDict[convertedList[-1]]= convertedList
-
-        return True, funcDict, cResponse
-
-
+        else:
+            cResponse = "muaggat failed for " + aSym
+            return False, None, cResponse
 
     except socket.timeout as e:
         Msg = 'Soil Data Access timeout error'
-        return False, Msg, None
+        return False, None, Msg
 
     except socket.error as e:
         Msg = 'Socket error: ' + str(e)
-        return False, Msg, None
+        return False, None, Msg
+
+    except HTTPError as e:
+        Msg = 'HTTP Error' + str(e)
+        return False, None, Msg
+
+    except URLError as e:
+        Msg = 'URL Error' + str(e)
+        return False, None, Msg
 
     except:
         errorMsg()
-        Msg = 'Unknown error collecting muaggatt table for ' + eSSA
-        return False, Msg, None
+        Msg = 'Unhandled error collecting muaggat for ' + aSym
+        return False, None, Msg
 
 #===============================================================================
 
@@ -189,7 +202,6 @@ from BaseHTTPServer import BaseHTTPRequestHandler as bhrh
 #import xml.etree.cElementTree as ET
 
 arcpy.env.overwriteOutput = True
-
 
 PrintMsg('\n \n')
 
@@ -200,11 +212,10 @@ jLayer = arcpy.GetParameterAsText(3)
 #arcpy.AddMessage(nullParam)
 srcDir = os.path.dirname(sys.argv[0])
 
-ordLst = ['musym', 'muname', 'mustatus', 'slopegraddcp', 'slopegradwta', 'brockdepmin', 'wtdepannmin', 'wtdepaprjunmin', 'flodfreqdcd', 'flodfreqmax', 'pondfreqprs', 'aws025wta', 'aws050wta', 'aws0100wta', 'aws0150wta', 'drclassdcd', 'drclasswettest', 'hydgrpdcd', 'iccdcd', 'iccdcdpct', 'niccdcd', 'niccdcdpct', 'engdwobdcd', 'engdwbdcd', 'engdwbll', 'engdwbml', 'engstafdcd', 'engstafll', 'engstafml', 'engsldcd', 'engsldcp', 'englrsdcd', 'engcmssdcd', 'engcmssmp', 'urbrecptdcd', 'urbrecptwta', 'forpehrtdcp', 'hydclprs', 'awmmfpwwta', 'mukey']
+tblName = 'SOD_muaggat'
 
 try:
     areaList = areaParam.split(";")
-
 
     failMuaggatt = list()
 
@@ -213,83 +224,97 @@ try:
     n=0
     arcpy.SetProgressor('step', 'Starting MUAGGATT Tool...', 0, jobCnt, 1)
 
-    compDict = dict()
+    #compDict = dict()
 
     for eSSA in areaList:
         n = n + 1
         arcpy.SetProgressorLabel('Collecting muaggatt table for: ' + eSSA + " (" + str(n) + ' of ' + str(jobCnt) + ')')
 
-        #send the request
-        #True, funcDict, cResponse
-        gP1, gP2, gP3 = getMuaggatt(eSSA, ordLst)
+        agLogic, agData, agMsg = getMuaggatt(eSSA)
 
         #if it was successful...
-        if gP1:
-            if len(gP2) == 0:
+        if agLogic:
+            if len(agData) == 0:
                 PrintMsg('No records returned for ' + eSSA, 1)
                 failMuaggatt.append(eSSA )
-                arcpy.SetProgressorPosition()
+                
             else:
-                PrintMsg('Response for muaggatt request on ' + eSSA + ' = ' + gP3)
-                for k,v in gP2.iteritems():
-                    compDict[k] = v
-                arcpy.SetProgressorPosition()
+                PrintMsg('Response for muaggatt request on ' + eSSA + ' = ' + agMsg)
+                agRes = agData["Table"]
+
+            if not arcpy.Exists(WS + os.sep + tblName):
+
+                columnNames = agRes.pop(0)
+                columnInfo = agRes.pop(0)
+
+                newTable = CreateNewTable(tblName, columnNames, columnInfo)
+
+                with arcpy.da.InsertCursor(newTable, columnNames) as cursor:
+                    for row in agRes:
+                        cursor.insertRow(row)
+
+                # convert from in-memory to table on disk
+                arcpy.conversion.TableToTable(newTable, WS, tblName)
+
+
+            else:
+                columnNames = agRes.pop(0)
+                columnInfo = agRes.pop(0)
+
+                with arcpy.da.InsertCursor(WS + os.sep + tblName, columnNames) as cursor:
+                    for row in agRes:
+                        cursor.insertRow(row)
+
+               
 
         #if it was unsuccessful...
         else:
             #try again
-            gP1, gP2, gP3 = getMuaggatt(eSSA, ordLst)
+            agLogic, agData, agMsg = getMuaggatt(eSSA)
 
             #if 2nd run was successful
-            if gP1:
-                if len(gP2) == 0:
+            if agLogic:
+                if len(agData) == 0:
                     PrintMsg('No records returned for ' + eSSA , 1)
                     failMuaggatt.append(eSSA )
-                    arcpy.SetProgressorPosition()
+
                 else:
-                    PrintMsg('Response for muaggatt table request on'  + eSSA + ' = ' + gP3 + ' - 2nd attempt')
-                    for k,v in gP2.iteritems():
-                        compDict[k] = v
-                    arcpy.SetProgressorPosition()
+                    PrintMsg('Response for muaggatt table request on'  + eSSA + ' = ' + agMsg + ' - 2nd attempt')
+                    agRes = agData["Table"]
+
+                if not arcpy.Exists(WS + os.sep + tblName):
+
+                    columnNames = agRes.pop(0)
+                    columnInfo = agRes.pop(0)
+
+                    newTable = CreateNewTable(tblName, columnNames, columnInfo)
+
+                    with arcpy.da.InsertCursor(newTable, columnNames) as cursor:
+                        for row in agRes:
+                            cursor.insertRow(row)
+
+                    # convert from in-memory to table on disk
+                    arcpy.conversion.TableToTable(newTable, WS, tblName)
+
+                else:
+                    columnNames = agRes.pop(0)
+                    columnInfo = agRes.pop(0)
+
+                    with arcpy.da.InsertCursor(WS + os.sep + tblName, columnNames) as cursor:
+                        for row in agRes:
+                            cursor.insertRow(row)
+
 
             #if 2nd run was unsuccesful that's' it
             else:
-                PrintMsg(gP3)
+                PrintMsg(agMsg)
                 failMuaggatt.append(eSSA)
-                arcpy.SetProgressorPosition()
 
-    arcpy.AddMessage('\n')
-##########################################################################################################
-    if len(compDict) > 0:
-        #create the geodatabase output tables
-        tblName = "SOD_muaggatt"
-
-        jTbl = WS + os.sep  + tblName
-
-        #fields list for cursor
-        fldLst = ordLst
-
-        #define the template table delivered with the tool
-        template_table = srcDir + os.sep + 'templates.gdb' + os.sep + 'muaggatt_template'
-
-        arcpy.management.CreateTable(WS, tblName, template_table)
-
-        #populate the table
-        cursor = arcpy.da.InsertCursor(jTbl, fldLst)
-
-        for value in compDict:
-
-            row = compDict.get(value)
-            cursor.insertRow(row)
-
-        del cursor
-        del compDict
-
-    else:
-        arcpy.AddMessage(r'No data to build muaggatt table for ' + eSSA + '\n')
-
+        arcpy.SetProgressorPosition()
 
     if jLayer != "":
+
+        jTbl = WS + os.sep + tblName
 
         try:
             mxd = arcpy.mapping.MapDocument("CURRENT")

@@ -58,7 +58,7 @@ def rslvProps(aProp):
     try:
 
         #propDict = {'Wind Erodibility Index': 'wei', 'Wind Erodibility Group' : 'weg', 'Drainage Class' : 'drainagecl', 'Hydrologic Group' : 'hydgrp', 'Corrosion of Steel' : 'corsteel', 'Corrosion of Steel' : 'corsteel', 'Taxonomic Class Name' : 'taxclname', 'Taxonomic Suborder' : 'taxsuborder', 'Taxonomic Order' : 'taxorder', 'Taxonomic Temperature Regime' : 'taxtempregime', 't Factor' : 'tfact', 'Cation Exchange Capcity - Rep Value': 'cec7_r', 'CaCO3 Clay - High': 'claysizedcarb_h', 'Coarse Silt - Low': 'siltco_l', 'Total Rock Fragment Volume - Rep Value': 'fragvoltot_r', 'Water Soluble Phosphate - Rep Value': 'ph2osoluble_r', 'Sum of Bases - High': 'sumbases_h', 'Available Water Capacity - Low': 'awc_l', 'Fine Sand - Low': 'sandfine_l', 'Extractable Acidity - High': 'extracid_h', 'CaCO3 Clay - Rep Value': 'claysizedcarb_r', 'pH Oxidized - Rep Value': 'phoxidized_r', 'Oxalate Aluminum - Low': 'aloxalate_l', 'Coarse Sand - Rep Value': 'sandco_r', 'no. 4 sieve - Low': 'sieveno4_l', 'Bulk Density 15 bar H2O - High': 'dbfifteenbar_h', 'Electrical Conductivity - Rep Value': 'ec_r', 'Calcium Carbonate - Low': 'caco3_l', 'Bulk Density 0.33 bar H2O - Low': 'dbthirdbar_l', 'Rock Fragments 3 - 10 cm- Rep Value': 'frag3to10_r', 'Bray 1 Phosphate - High': 'pbray1_h', 'pH Oxidized - Low': 'phoxidized_l', 'Exchangeable Sodium Percentage - Rep Value': 'esp_r', 'Sodium Adsorption Ratio - Rep Value': 'sar_r', 'no. 4 sieve - High': 'sieveno4_h', 'Medium Sand - Low': 'sandmed_l', 'Bulk Density 15 bar H2O - Rep Value': 'dbfifteenbar_r', 'Effective Cation Exchange Capcity - Rep Value': 'ecec_r', 'pH Oxidized - High': 'phoxidized_h', 'Rock Fragments 3 - 10 cm- High': 'frag3to10_h', 'Oxalate Iron - Low': 'feoxalate_l', 'Free Iron - High': 'freeiron_h', 'Total Rock Fragment Volume - High': 'fragvoltot_h', 'Fine Sand - High': 'sandfine_h', 'Total Sand - High': 'sandtotal_h', 'Liquid Limit - Low': 'll_l', 'Organic Matter - Rep Value': 'om_r', 'Coarse Sand - High': 'sandco_h', 'Very Fine Sand - Low': 'sandvf_l', 'Oxalate Iron - Rep Value': 'feoxalate_r', 'Very Coarse Sand - Low': 'sandvc_l', 'Total Silt - Rep Value': 'silttotal_r', 'Liquid Limit - High': 'll_h', 'Saturated Hydraulic Conductivity - High': 'ksat_h', 'no. 40 sieve - Rep Value': 'sieveno40_r', 'Extract Aluminum - High': 'extral_h', 'no. 40 sieve - High': 'sieveno40_h', 'Kr ': 'krfact', 'Coarse Sand - Low': 'sandco_l', 'Sum of Bases - Rep Value': 'sumbases_r', 'Organic Matter - High': 'om_h', 'no. 10 sieve - Rep Value': 'sieveno10_r', 'Total Silt - High': 'silttotal_h', 'Saturated Hydraulic Conductivity - Low': 'ksat_l', 'Calcium Carbonate - Rep Value': 'caco3_r', 'pH .01M CaCl2 - Rep Value': 'ph01mcacl2_r', 'Bulk Density 15 bar H2O - Low': 'dbfifteenbar_l', 'Sodium Adsorption Ratio - Low': 'sar_l', 'Gypsum - High': 'gypsum_h', 'Rubbed Fiber % - Rep Value': 'fiberrubbedpct_r', 'CaCO3 Clay - Low': 'claysizedcarb_l', 'Electrial Conductivity 1:5 by volume - Rep Value': 'ec15_r', 'Satiated H2O - Rep Value': 'wsatiated_r', 'Medium Sand - High': 'sandmed_h', 'Bulk Density oven dry - Rep Value': 'dbovendry_r', 'Plasticity Index - Low': 'pi_l', 'Extractable Acidity - Rep Value': 'extracid_r', 'Oxalate Aluminum - Rep Value': 'aloxalate_r', 'Medium Sand - Rep Value': 'sandmed_r', 'Total Rock Fragment Volume - Low': 'fragvoltot_l', 'pH 1:1 water - Low': 'ph1to1h2o_l', 'no. 10 sieve - Low': 'sieveno10_l', 'Very Coarse Sand - Rep Value': 'sandvc_r', 'Gypsum - Low': 'gypsum_l', 'Plasticity Index - High': 'pi_h', 'Total Phosphate - High': 'ptotal_h', 'Unrubbed Fiber % - Rep Value': 'fiberunrubbedpct_r', 'Bulk Density 0.1 bar H2O - High': 'dbtenthbar_h', 'Cation Exchange Capcity - Low': 'cec7_l', '0.33 bar H2O - Rep Value': 'wthirdbar_r', '0.1 bar H2O - Low': 'wtenthbar_l', 'Bulk Density 0.1 bar H2O - Rep Value': 'dbtenthbar_r', 'no. 40 sieve - Low': 'sieveno40_l', 'Extract Aluminum - Low': 'extral_l', 'Calcium Carbonate - High': 'caco3_h', 'Water Soluble Phosphate - Low': 'ph2osoluble_l', 'Gypsum - Rep Value': 'gypsum_r', '0.33 bar H2O - High': 'wthirdbar_h', 'Bray 1 Phosphate - Low': 'pbray1_l', 'Available Water Capacity - Rep Value': 'awc_r', 'Rubbed Fiber % - High': 'fiberrubbedpct_h', 'Coarse Silt - Rep Value': 'siltco_r', '0.1 bar H2O - High': 'wtenthbar_h', 'Plasticity Index - Rep Value': 'pi_r', 'Extract Aluminum - Rep Value': 'extral_r', 'Fine Sand - Rep Value': 'sandfine_r', 'Fine Silt - Low': 'siltfine_l', 'Bulk Density oven dry - High': 'dbovendry_h', 'Total Clay - High': 'claytotal_h', 'Fine Silt - High': 'siltfine_h', 'Exchangeable Sodium Percentage - High': 'esp_h', 'Total Clay - Low': 'claytotal_l', 'Bulk Density 0.33 bar H2O - High': 'dbthirdbar_h', 'Total Phosphate - Low': 'ptotal_l', 'Cation Exchange Capcity - High': 'cec7_h', '15 bar H2O - Low': 'wfifteenbar_l', 'no. 10 sieve - High': 'sieveno10_h', 'Extractable Acidity - Low': 'extracid_l', 'Electrical Conductivity - High': 'ec_h', 'Oxalate Phosphate - Low': 'poxalate_l', 'Electrial Conductivity 1:5 by volume - High': 'ec15_h', 'Sodium Adsorption Ratio - High': 'sar_h', 'Liquid Limit - Rep Value': 'll_r', '0.33 bar H2O - Low': 'wthirdbar_l', 'Satiated H2O - High': 'wsatiated_h', 'Bulk Density 0.33 bar H2O - Rep Value': 'dbthirdbar_r', '15 bar H2O - Rep Value': 'wfifteenbar_r', '15 bar H2O - High': 'wfifteenbar_h', 'no. 200 sieve - Low': 'sieveno200_l', 'LEP - Low': 'lep_l', 'Satiated H2O - Low': 'wsatiated_l', 'Total Clay - Rep Value': 'claytotal_r', 'Very Fine Sand - High': 'sandvf_h', 'Available Water Capacity - High': 'awc_h', 'Total Phosphate - Rep Value': 'ptotal_r', 'Electrical Conductivity - Low': 'ec_l', 'Oxalate Aluminum - High': 'aloxalate_h', 'Effective Cation Exchange Capcity - High': 'ecec_h', 'Rubbed Fiber % - Low': 'fiberrubbedpct_l', 'Coarse Silt - High': 'siltco_h', 'Bulk Density oven dry - Low': 'dbovendry_l', 'no. 4 sieve - Rep Value': 'sieveno4_r', 'Bray 1 Phosphate - Rep Value': 'pbray1_r', 'no. 200 sieve - High': 'sieveno200_h', '0.1 bar H2O - Rep Value': 'wtenthbar_r', 'Unrubbed Fiber % - Low': 'fiberunrubbedpct_l', 'pH .01M CaCl2 - Low': 'ph01mcacl2_l', 'Saturated Hydraulic Conductivity - Rep Value': 'ksat_r', 'Kw ': 'kwfact', 'Unrubbed Fiber % - High': 'fiberunrubbedpct_h', 'Rock Fragments > 10 cm - High': 'fraggt10_h', 'Kf ': 'kffact', 'no. 200 sieve - Rep Value': 'sieveno200_r', 'pH .01M CaCl2 - High': 'ph01mcacl2_h', 'Oxalate Phosphate - Rep Value': 'poxalate_r', 'Rock Fragments 3 - 10 cm- Low': 'frag3to10_l', 'Water Soluble Phosphate - High': 'ph2osoluble_h', 'Very Fine Sand - Rep Value': 'sandvf_r', 'Electrial Conductivity 1:5 by volume - Low': 'ec15_l', 'Total Silt - Low': 'silttotal_l', 'Total Sand - Low': 'sandtotal_l', 'Organic Matter - Low': 'om_l', 'Fine Silt - Rep Value': 'siltfine_r', 'Very Coarse Sand - High': 'sandvc_h', 'Free Iron - Low': 'freeiron_l', 'Rock Fragments > 10 cm - Rep Value': 'fraggt10_r', 'LEP - High': 'lep_h', 'pH 1:1 water - High': 'ph1to1h2o_h', 'Oxalate Phosphate - High': 'poxalate_h', 'Total Sand - Rep Value': 'sandtotal_r', 'Oxalate Iron - High': 'feoxalate_h', 'Rock Fragments > 10 cm - Low': 'fraggt10_l', 'Sum of Bases - Low': 'sumbases_l', 'Free Iron - Rep Value': 'freeiron_r', 'LEP - Rep Value': 'lep_r', 'Effective Cation Exchange Capcity - Low': 'ecec_l', 'pH 1:1 water - Rep Value': 'ph1to1h2o_r', 'Exchangeable Sodium Percentage - Low': 'esp_l', 'Ki ': 'kifact', 'Bulk Density 0.1 bar H2O - Low': 'dbtenthbar_l'}
-        propDict = {'0.1 bar H2O - Rep Value' : 'wtenthbar_r', '0.33 bar H2O - Rep Value' : 'wthirdbar_r', '15 bar H2O - Rep Value' : 'wfifteenbar_r', 'Available Water Capacity - Rep Value' : 'awc_r', 'Bray 1 Phosphate - Rep Value' : 'pbray1_r', 'Bulk Density 0.1 bar H2O - Rep Value' : 'dbtenthbar_r', 'Bulk Density 0.33 bar H2O - Rep Value' : 'dbthirdbar_r', 'Bulk Density 15 bar H2O - Rep Value' : 'dbfifteenbar_r', 'Bulk Density oven dry - Rep Value' : 'dbovendry_r', 'CaCO3 Clay - Rep Value' : 'claysizedcarb_r', 'Calcium Carbonate - Rep Value' : 'caco3_r', 'Cation Exchange Capcity - Rep Value' : 'cec7_r', 'Coarse Sand - Rep Value' : 'sandco_r', 'Coarse Silt - Rep Value' : 'siltco_r', 'Corrosion of Steel' : 'corsteel', 'Corrosion of Concrete' : 'corcon', 'Drainage Class' : 'drainagecl', 'Effective Cation Exchange Capcity - Rep Value' : 'ecec_r', 'Electrial Conductivity 1:5 by volume - Rep Value' : 'ec15_r', 'Electrical Conductivity - Rep Value' : 'ec_r', 'Exchangeable Sodium Percentage - Rep Value' : 'esp_r', 'Extract Aluminum - Rep Value' : 'extral_r', 'Extractable Acidity - Rep Value' : 'extracid_r', 'Fine Sand - Rep Value' : 'sandfine_r', 'Fine Silt - Rep Value' : 'siltfine_r', 'Free Iron - Rep Value' : 'freeiron_r', 'Gypsum - Rep Value' : 'gypsum_r', 'Hydrologic Group' : 'hydgrp', 'Kf ' : 'kffact', 'Ki ' : 'kifact', 'Kr ' : 'krfact', 'Kw ' : 'kwfact', 'LEP - Rep Value' : 'lep_r', 'Liquid Limit - Rep Value' : 'll_r', 'Medium Sand - Rep Value' : 'sandmed_r', 'Organic Matter - Rep Value' : 'om_r', 'Oxalate Aluminum - Rep Value' : 'aloxalate_r', 'Oxalate Iron - Rep Value' : 'feoxalate_r', 'Oxalate Phosphate - Rep Value' : 'poxalate_r', 'Plasticity Index - Rep Value' : 'pi_r', 'Rock Fragments 3 - 10 cm - Rep Value' : 'frag3to10_r', 'Rock Fragments > 10 cm - Rep Value' : 'fraggt10_r', 'Rubbed Fiber % - Rep Value' : 'fiberrubbedpct_r', 'Satiated H2O - Rep Value' : 'wsatiated_r', 'Saturated Hydraulic Conductivity - Rep Value' : 'ksat_r', 'Sodium Adsorption Ratio - Rep Value' : 'sar_r', 'Sum of Bases - Rep Value' : 'sumbases_r', 'Taxonomic Class Name' : 'taxclname', 'Taxonomic Order' : 'taxorder', 'Taxonomic Suborder' : 'taxsuborder', 'Taxonomic Temperature Regime' : 'taxtempregime', 'Total Clay - Rep Value' : 'claytotal_r', 'Total Phosphate - Rep Value' : 'ptotal_r', 'Total Rock Fragment Volume - Rep Value' : 'fragvoltot_r', 'Total Sand - Rep Value' : 'sandtotal_r', 'Total Silt - Rep Value' : 'silttotal_r', 'Unrubbed Fiber % - Rep Value' : 'fiberunrubbedpct_r', 'Very Coarse Sand - Rep Value' : 'sandvc_r', 'Very Fine Sand - Rep Value' : 'sandvf_r', 'Water Soluble Phosphate - Rep Value' : 'ph2osoluble_r', 'Wind Erodibility Group' : 'weg', 'Wind Erodibility Index' : 'wei', 'no. 10 sieve - Rep Value' : 'sieveno10_r', 'no. 200 sieve - Rep Value' : 'sieveno200_r', 'no. 4 sieve - Rep Value' : 'sieveno4_r', 'no. 40 sieve - Rep Value' : 'sieveno40_r', 'pH .01M CaCl2 - Rep Value' : 'ph01mcacl2_r', 'pH 1:1 water - Rep Value' : 'ph1to1h2o_r', 'pH Oxidized - Rep Value' : 'phoxidized_r', 't Factor' : 'tfact'}
+        propDict = {'Range Production - Favorable Year' : 'rsprod_h', 'Range Production - Normal Year' : 'rsprod_r', 'Range Production - Unfavorable Year' : 'rsprod_l', '0.1 bar H2O - Rep Value' : 'wtenthbar_r', '0.33 bar H2O - Rep Value' : 'wthirdbar_r', '15 bar H2O - Rep Value' : 'wfifteenbar_r', 'Available Water Capacity - Rep Value' : 'awc_r', 'Bray 1 Phosphate - Rep Value' : 'pbray1_r', 'Bulk Density 0.1 bar H2O - Rep Value' : 'dbtenthbar_r', 'Bulk Density 0.33 bar H2O - Rep Value' : 'dbthirdbar_r', 'Bulk Density 15 bar H2O - Rep Value' : 'dbfifteenbar_r', 'Bulk Density oven dry - Rep Value' : 'dbovendry_r', 'CaCO3 Clay - Rep Value' : 'claysizedcarb_r', 'Calcium Carbonate - Rep Value' : 'caco3_r', 'Cation Exchange Capcity - Rep Value' : 'cec7_r', 'Coarse Sand - Rep Value' : 'sandco_r', 'Coarse Silt - Rep Value' : 'siltco_r', 'Corrosion of Steel' : 'corsteel', 'Corrosion of Concrete' : 'corcon', 'Drainage Class' : 'drainagecl', 'Effective Cation Exchange Capcity - Rep Value' : 'ecec_r', 'Electrial Conductivity 1:5 by volume - Rep Value' : 'ec15_r', 'Electrical Conductivity - Rep Value' : 'ec_r', 'Exchangeable Sodium Percentage - Rep Value' : 'esp_r', 'Extract Aluminum - Rep Value' : 'extral_r', 'Extractable Acidity - Rep Value' : 'extracid_r', 'Fine Sand - Rep Value' : 'sandfine_r', 'Fine Silt - Rep Value' : 'siltfine_r', 'Free Iron - Rep Value' : 'freeiron_r', 'Gypsum - Rep Value' : 'gypsum_r', 'Hydrologic Group' : 'hydgrp', 'Kf ' : 'kffact', 'Ki ' : 'kifact', 'Kr ' : 'krfact', 'Kw ' : 'kwfact', 'LEP - Rep Value' : 'lep_r', 'Liquid Limit - Rep Value' : 'll_r', 'Medium Sand - Rep Value' : 'sandmed_r', 'Organic Matter - Rep Value' : 'om_r', 'Oxalate Aluminum - Rep Value' : 'aloxalate_r', 'Oxalate Iron - Rep Value' : 'feoxalate_r', 'Oxalate Phosphate - Rep Value' : 'poxalate_r', 'Plasticity Index - Rep Value' : 'pi_r', 'Rock Fragments 3 - 10 cm - Rep Value' : 'frag3to10_r', 'Rock Fragments > 10 cm - Rep Value' : 'fraggt10_r', 'Rubbed Fiber % - Rep Value' : 'fiberrubbedpct_r', 'Satiated H2O - Rep Value' : 'wsatiated_r', 'Saturated Hydraulic Conductivity - Rep Value' : 'ksat_r', 'Sodium Adsorption Ratio - Rep Value' : 'sar_r', 'Sum of Bases - Rep Value' : 'sumbases_r', 'Taxonomic Class Name' : 'taxclname', 'Taxonomic Order' : 'taxorder', 'Taxonomic Suborder' : 'taxsuborder', 'Taxonomic Temperature Regime' : 'taxtempregime', 'Total Clay - Rep Value' : 'claytotal_r', 'Total Phosphate - Rep Value' : 'ptotal_r', 'Total Rock Fragment Volume - Rep Value' : 'fragvoltot', 'Total Sand - Rep Value' : 'sandtotal_r', 'Total Silt - Rep Value' : 'silttotal_r', 'Unrubbed Fiber % - Rep Value' : 'fiberunrubbedpct_r', 'Very Coarse Sand - Rep Value' : 'sandvc_r', 'Very Fine Sand - Rep Value' : 'sandvf_r', 'Water Soluble Phosphate - Rep Value' : 'ph2osoluble_r', 'Wind Erodibility Group' : 'weg', 'Wind Erodibility Index' : 'wei', 'no. 10 sieve - Rep Value' : 'sieveno10_r', 'no. 200 sieve - Rep Value' : 'sieveno200_r', 'no. 4 sieve - Rep Value' : 'sieveno4_r', 'no. 40 sieve - Rep Value' : 'sieveno40_r', 'pH .01M CaCl2 - Rep Value' : 'ph01mcacl2_r', 'pH 1:1 water - Rep Value' : 'ph1to1h2o_r', 'pH Oxidized - Rep Value' : 'phoxidized_r', 't Factor' : 'tfact'}
         propVal = propDict.get(aProp)
 
         return propVal
@@ -226,22 +226,18 @@ def getProps(aProp, areaSym, aggMethod, tDep, bDep, mmC):
             " GROUP BY areasymbol, musym, muname, mu.mukey, c.cokey,  compname, comppct_r\n"\
             " ORDER BY areasymbol, musym, muname, mu.mukey, comppct_r DESC, c.cokey\n"\
 
-
-
         #PrintMsg(propQry.replace("&gt;", ">").replace("&lt;", "<"))
         #arcpy.AddMessage(' \n \n ')
         # send JSON POSTREST request to Soil Data Access
         # and collect results into a dictionary
         #arcpy.AddMessage("\nSending JSON request...")
 
-        funcDict = dict()
-
         theURL = "https://sdmdataaccess.nrcs.usda.gov"
         url = theURL + "/Tabular/SDMTabularService/post.rest"
 
         # Create request using JSON, return data as JSON
         request = {}
-        request["format"] = "JSON"
+        request["format"] = "JSON+COLUMNNAME+METADATA"
         request["query"] = propQry
 
         #json.dumps = serialize obj (request dictionary) to a JSON formatted str
@@ -257,6 +253,7 @@ def getProps(aProp, areaSym, aggMethod, tDep, bDep, mmC):
 
         # Convert the returned JSON string into a Python dictionary.
         qData = json.loads(qResults)
+        PrintMsg(qData)
 
         # get rid of objects
         del qResults, response, req
@@ -267,66 +264,97 @@ def getProps(aProp, areaSym, aggMethod, tDep, bDep, mmC):
         # if dictionary key "Table" is found
         if "Table" in qData:
             cResponse = 'OK'
-
-            # get its value
-            resLst = qData["Table"]  # Data as a list of lists. All values come back as string.
+            return True, qData, cResponse
 
 
-            for e in resLst:
-                areasymbol = e[0]
-                musym = e[1]
-                muname = e[2]
-                mukey = e[3]
-                propBack = e[4]
-
-                try:
-                    propback = float(propBack)
-
-                except:
-                    #test to see if there is anything returned for the property
-                    if str(propBack):
-                        pass
-                    #if there isn't, set it to None
-                    else:
-                        propBack = None
-
-                funcDict[mukey] = mukey, int(mukey), areasymbol, musym, muname, propBack
-
-
-        # if dictionary key "Table" is NOT found
-        # No data returned for this query
         else:
-          pass
-
-        return True, funcDict, cResponse
-
-
-
+            cResponse = 'Failed'
+            return False, None, cResponse
 
 
     except socket.timeout as e:
         Msg = 'Soil Data Access timeout error'
-        return False, Msg, None
+        return False, None, Msg
 
     except socket.error as e:
         Msg = 'Socket error: ' + str(e)
-        return False, Msg, None
+        return False, None, Msg
 
     except HTTPError as e:
         Msg = 'HTTP Error' + str(e)
-        return False, Msg, None
+        return False, None, Msg
 
     except URLError as e:
         Msg = 'URL Error' + str(e)
-        return False, Msg, None
+        return False, None, Msg
     except:
         errorMsg()
         Msg = 'Unknown error collecting interpreations for ' + eSSA
         return False, Msg, None
 
+def CreateNewTable(newTable, columnNames, columnInfo):
+    # Create new table. Start with in-memory and then export to geodatabase table
+    #
+    # ColumnNames and columnInfo come from the Attribute query JSON string
+    # MUKEY would normally be included in the list, but it should already exist in the output featureclass
+    #
+    try:
+        # Dictionary: SQL Server to FGDB
+        dType = dict()
+
+        dType["int"] = "long"
+        dType["smallint"] = "short"
+        dType["bit"] = "short"
+        dType["varbinary"] = "blob"
+        dType["nvarchar"] = "text"
+        dType["varchar"] = "text"
+        dType["char"] = "text"
+        dType["datetime"] = "date"
+        dType["datetime2"] = "date"
+        dType["smalldatetime"] = "date"
+        dType["decimal"] = "double"
+        dType["numeric"] = "double"
+        dType["float"] = "double"
+
+        # numeric type conversion depends upon the precision and scale
+        dType["numeric"] = "float"  # 4 bytes
+        dType["real"] = "double"  # 8 bytes
+
+        # Iterate through list of field names and add them to the output table
+        i = 0
+
+        # ColumnInfo contains:
+        # ColumnOrdinal, ColumnSize, NumericPrecision, NumericScale, ProviderType, IsLong, ProviderSpecificDataType, DataTypeName
+        # PrintMsg(" \nFieldName, Length, Precision, Scale, Type", 1)
+
+        joinFields = list()
+        outputTbl = os.path.join("IN_MEMORY", os.path.basename(newTable))
+        arcpy.CreateTable_management(os.path.dirname(outputTbl), os.path.basename(outputTbl))
+
+        for i, fldName in enumerate(columnNames):
+            vals = columnInfo[i].split(",")
+            length = int(vals[1].split("=")[1])
+            precision = int(vals[2].split("=")[1])
+            scale = int(vals[3].split("=")[1])
+            dataType = dType[vals[4].lower().split("=")[1]]
+
+            if fldName.lower().endswith("key"):
+                # Per SSURGO standards, key fields should be string. They come from Soil Data Access as long integer.
+                dataType = 'text'
+                length = 30
+
+            arcpy.AddField_management(outputTbl, fldName, dataType, precision, scale, length)
+
+        return outputTbl
+
+    except:
+        errorMsg()
+    return False
+
 #===============================================================================
 
 import arcpy, sys, os, traceback, time, urllib2, json
+from urllib2 import HTTPError, URLError
 #import xml.etree.cElementTree as ET
 
 arcpy.env.overwriteOutput = True
@@ -383,12 +411,26 @@ try:
     #loop through the lists
     for prop in propLst:
 
+        outTbl = arcpy.ValidateTableName(prop)
+        outTbl = outTbl.replace("__", "_")
+        if aggMethod == "Weighted Average":
+            tblName = 'tbl_' + outTbl + aggMod + "_" + tDep + "_" + bDep
+        elif aggMethod == "Dominant Component (Category)":
+            tblName = 'tbl_' + outTbl + aggMod
+        elif aggMethod == "Min\Max":
+            tblName = 'tbl_' + outTbl + aggMod + '_' + mmC.upper()
+        elif aggMethod == "Dominant Component (Numeric)":
+            tblName = 'tbl_' + outTbl + aggMod + "_" + tDep + "_" + bDep
+        elif aggMethod == "Dominant Condition":
+            tblName = 'tbl_' + outTbl + aggMod
+
+
+
         #convert to NASIS speak i.e. Bulk Density =db
         propVal = rslvProps(prop).strip()
 
 
         arcpy.AddMessage("Running: " + propVal)
-        compDict = dict()
 ##        if interp.find("{:}") <> -1:
 ##            interp = interp.replace("{:}", ";")
 
@@ -397,130 +439,94 @@ try:
             arcpy.SetProgressorLabel('Collecting ' + prop + ' for: ' + eSSA + " (" + str(n) + ' of ' + str(jobCnt) + ')')
 
             #send the request
-            gP1, gP2, gP3 = getProps(propVal, eSSA, aggMethod, tDep, bDep, mmC)
+            propLogic, propData, propMsg = getProps(propVal, eSSA, aggMethod, tDep, bDep, mmC)
 
             #if it was successful...
-            if gP1:
-                if len(gP2) == 0:
-                    #PrintMsg('Response for ' + interp + ' on ' + eSSA + ' = ' + gP3)
+            if propLogic:
+                if len(propData) == 0:
+                    #PrintMsg('Response for ' + interp + ' on ' + eSSA + ' = ' + propMsg)
                     PrintMsg('No records returned for ' + eSSA + ': ' + propVal, 1)
                     failProps.append(eSSA + ":" + propVal)
                     arcpy.SetProgressorPosition()
                 else:
-                    PrintMsg('Response for ' + propVal + ' on ' + eSSA + ' = ' + gP3)
-                    for k,v in gP2.iteritems():
-                        compDict[k] = v
-                    arcpy.SetProgressorPosition()
+                    PrintMsg('Response for ' + propVal + ' on ' + eSSA + ' = ' + propMsg)
+
+                    propRes = propData["Table"]
+                    #arcpy.AddMessage(propRes)
+
+                    if not arcpy.Exists(WS + os.sep + tblName):
+
+                        columnNames = propRes.pop(0)
+                        columnInfo = propRes.pop(0)
+
+                        newTable = CreateNewTable(tblName, columnNames, columnInfo)
+
+                        with arcpy.da.InsertCursor(newTable, columnNames) as cursor:
+                            for row in propRes:
+                                cursor.insertRow(row)
+
+                        #convert from in-memory to table on disk
+                        arcpy.conversion.TableToTable(newTable, WS, tblName)
+                        arcpy.SetProgressorPosition()
+
+                    else:
+                        columnNames = propRes.pop(0)
+                        columnInfo = propRes.pop(0)
+
+                        with arcpy.da.InsertCursor(WS + os.sep + tblName, columnNames) as cursor:
+                            for row in propRes:
+                                cursor.insertRow(row)
+
+                        arcpy.SetProgressorPosition()
 
             #if it was unsuccessful...
             else:
                 #try again
                 #PrintMsg('Failed first attempt running ' + prop + ' for ' + eSSA + '. Resubmitting request.', 1)
-                gP1, gP2, gP3 = getProps(propVal, eSSA, aggMethod, tDep, bDep, mmC)
+                propLogic, propData, propMsg = getProps(propVal, eSSA, aggMethod, tDep, bDep, mmC)
 
                 #if 2nd run was successful
-                if gP1:
-                    if len(gP2) == 0:
+                if propLogic:
+                    if len(propData) == 0:
                         PrintMsg('No records returned for ' + eSSA + ': ' + propVal, 1)
                         failProps.append(eSSA + ":" + propVal)
                         arcpy.SetProgressorPosition()
                     else:
-                        PrintMsg('Response for ' + propVal + ' on ' + eSSA + ' = ' + gP3 + ' - 2nd attempt')
-                        for k,v in gP2.iteritems():
-                            compDict[k] = v
-                        arcpy.SetProgressorPosition()
+                        PrintMsg('Response for ' + propVal + ' on ' + eSSA + ' = ' + propMsg + ' - 2nd attempt')
+                        if not arcpy.Exists(WS + os.sep + tblName):
+
+                            columnNames = propRes.pop(0)
+                            columnInfo = propRes.pop(0)
+
+                            newTable = CreateNewTable(tblName, columnNames, columnInfo)
+
+                            with arcpy.da.InsertCursor(newTable, columnNames) as cursor:
+                                for row in propRes:
+                                    cursor.insertRow(row)
+
+                            arcpy.conversion.TableToTable(newTable, WS, outTbl)
+                            arcpy.SetProgressorPosition()
+
+                        else:
+                            columnNames = propRes.pop(0)
+                            columnInfo = propRes.pop(0)
+
+                            with arcpy.da.InsertCursor(WS + os.sep + tblName, columnNames) as cursor:
+                                for row in propRes:
+                                    cursor.insertRow(row)
+
+                            arcpy.SetProgressorPosition()
 
                 #if 2nd run was unsuccesful that's' it
                 else:
-                    PrintMsg(gP2)
+                    PrintMsg(propData)
                     failProps.append(eSSA + ":" + propVal)
                     arcpy.SetProgressorPosition()
 
-        arcpy.AddMessage('\n')
-
-        if len(compDict) > 0:
-            #create the geodatabase output tables
-            #clean up the interp rule name to use as output table name
-            outTbl = arcpy.ValidateTableName(prop)
-            outTbl = outTbl.replace("__", "_")
-            if aggMethod == "Weighted Average":
-                tblName =  'tbl_' + outTbl + aggMod + "_" + tDep + "_" + bDep
-            elif aggMethod == "Dominant Component (Category)":
-                tblName =  'tbl_' + outTbl + aggMod
-            elif aggMethod == "Min\Max":
-                tblName =  'tbl_' + outTbl + aggMod + '_' + mmC.upper()
-            elif aggMethod == "Dominant Component (Numeric)":
-                tblName =  'tbl_' + outTbl + aggMod + "_" + tDep + "_" + bDep
-            elif aggMethod == "Dominant Condition":
-                tblName =  'tbl_' + outTbl + aggMod
-
-            jTbl = WS + os.sep  + tblName
-
-            #fields list for cursor
-            fldLst = ['MUKEY', 'int_MUKEY', 'areasymbol', 'musym', 'muname', propVal]
-
-
-            strFldLst = ['weg', 'taxclname', 'taxorder', 'taxsuborder', 'taxtempregime', 'corsteel', 'drainagecl', 'hydgrp', 'corcon']
-
-            #define the template table delivered with the tool
-            template_table = srcDir + os.sep + 'templates.gdb' + os.sep + 'prop_template_table_base'
-
-            #if propVal is in strFldLst create table here
-            if propVal in strFldLst:
-
-                arcpy.management.CreateTable(WS, tblName, template_table)
-                arcpy.management.AddField(os.path.join(WS, tblName), propVal, "TEXT", "#", "#", "150")
-
-                #populate the table
-                cursor = arcpy.da.InsertCursor(jTbl, fldLst)
-
-                for value in compDict:
-                    row = compDict.get(value)
-                    #somehow None gets converted to 'None' in the tuple???
-                    #convert it to a list and assign the property value back to None
-                    #ugly!!!
-                    if row[5] == 'None':
-                        rLst = list(row)
-                        rLst[5] = None
-                        row = rLst
-                        cursor.insertRow(row)
-                    else:
-                        cursor.insertRow(row)
-
-
-                del cursor
-                del compDict
-
-            #if propVal isn't in strFldLst then create the table here
-            else:
-                arcpy.management.CreateTable(WS, tblName, template_table)
-                arcpy.management.AddField(os.path.join(WS, tblName), propVal, "FLOAT")
-
-                #populate the table
-                cursor = arcpy.da.InsertCursor(jTbl, fldLst)
-
-                for value in compDict:
-                    row = compDict.get(value)
-                    #somehow None gets converted to 'None' in the tuple???
-                    #convert it to a list and assign the property value back to None
-                    #ugly!!!
-                    if row[5] == 'None':
-                        rLst = list(row)
-                        rLst[5] = None
-                        row = rLst
-                        cursor.insertRow(row)
-                    else:
-                        cursor.insertRow(row)
-
-
-                del cursor
-                del compDict
-
-        else:
-            arcpy.AddMessage(r'No data to build table for ' + prop + '\n')
-
 
     if jLayer != "":
+
+        jTbl = WS + os.sep + tblName
 
         try:
             mxd = arcpy.mapping.MapDocument("CURRENT")

@@ -56,6 +56,65 @@ def errorMsg():
         AddMsgAndPrint("Unhandled error in errorMsg method", 2)
         pass
 
+def CreateNewTable(newTable, columnNames, columnInfo):
+    # Create new table. Start with in-memory and then export to geodatabase table
+    #
+    # ColumnNames and columnInfo come from the Attribute query JSON string
+    # MUKEY would normally be included in the list, but it should already exist in the output featureclass
+    #
+    try:
+        # Dictionary: SQL Server to FGDB
+        dType = dict()
+
+        dType["int"] = "long"
+        dType["smallint"] = "short"
+        dType["bit"] = "short"
+        dType["varbinary"] = "blob"
+        dType["nvarchar"] = "text"
+        dType["varchar"] = "text"
+        dType["char"] = "text"
+        dType["datetime"] = "date"
+        dType["datetime2"] = "date"
+        dType["smalldatetime"] = "date"
+        dType["decimal"] = "double"
+        dType["numeric"] = "double"
+        dType["float"] = "double"
+
+        # numeric type conversion depends upon the precision and scale
+        dType["numeric"] = "float"  # 4 bytes
+        dType["real"] = "double"  # 8 bytes
+
+        # Iterate through list of field names and add them to the output table
+        i = 0
+
+        # ColumnInfo contains:
+        # ColumnOrdinal, ColumnSize, NumericPrecision, NumericScale, ProviderType, IsLong, ProviderSpecificDataType, DataTypeName
+        # PrintMsg(" \nFieldName, Length, Precision, Scale, Type", 1)
+
+        joinFields = list()
+        outputTbl = os.path.join("IN_MEMORY", os.path.basename(newTable))
+        arcpy.CreateTable_management(os.path.dirname(outputTbl), os.path.basename(outputTbl))
+
+        for i, fldName in enumerate(columnNames):
+            vals = columnInfo[i].split(",")
+            length = int(vals[1].split("=")[1])
+            precision = int(vals[2].split("=")[1])
+            scale = int(vals[3].split("=")[1])
+            dataType = dType[vals[4].lower().split("=")[1]]
+
+            if fldName.lower().endswith("key"):
+                # Per SSURGO standards, key fields should be string. They come from Soil Data Access as long integer.
+                dataType = 'text'
+                length = 30
+
+            arcpy.AddField_management(outputTbl, fldName, dataType, precision, scale, length)
+
+        return outputTbl
+
+    except:
+        errorMsg()
+    return False
+
 
 
 def getIntrps(interp, areaSym, aggMethod):
@@ -91,11 +150,7 @@ def getIntrps(interp, areaSym, aggMethod):
                 INNER JOIN  mapunit AS mu ON mu.lkey = l.lkey AND l.areasymbol LIKE '""" + areaSym + """'
                 INNER JOIN  component AS c ON c.mukey = mu.mukey  AND c.cokey = (SELECT TOP 1 c1.cokey FROM component AS c1
                 INNER JOIN mapunit ON c.mukey=mapunit.mukey AND c1.mukey=mu.mukey ORDER BY c1.comppct_r DESC, c1.cokey)"""
-##            interpQry ="SELECT areasymbol, musym, muname, mu.mukey  AS MUKEY,(SELECT interphr FROM component INNER JOIN cointerp ON component.cokey = cointerp.cokey AND component.cokey = c.cokey AND ruledepth = 0 AND mrulename LIKE "+interp+") as rating, (SELECT interphrc FROM component INNER JOIN cointerp ON component.cokey = cointerp.cokey AND component.cokey = c.cokey AND ruledepth = 0 AND mrulename LIKE "+interp+") as class\n"\
-##            " FROM legend  AS l\n"\
-##            " INNER JOIN  mapunit AS mu ON mu.lkey = l.lkey AND l.areasymbol LIKE '" + areaSym + "'\n"+\
-##            " INNER JOIN  component AS c ON c.mukey = mu.mukey  AND c.cokey = (SELECT TOP 1 c1.cokey FROM component AS c1\n"\
-##            " INNER JOIN mapunit ON c.mukey=mapunit.mukey AND c1.mukey=mu.mukey ORDER BY c1.comppct_r DESC, c1.cokey)\n"
+
         elif aggMethod == "Dominant Condition":
             interpQry = """SELECT areasymbol, musym, muname, mu.mukey/1  AS MUKEY,
             (SELECT TOP 1 ROUND (AVG(interphr) over(partition by interphrc),2)
@@ -126,23 +181,6 @@ def getIntrps(interp, areaSym, aggMethod):
             INNER JOIN mapunit ON c.mukey=mapunit.mukey AND c1.mukey=mu.mukey ORDER BY c1.comppct_r DESC, c1.cokey)
             ORDER BY areasymbol, musym, muname, mu.mukey"""
 
-##            "SELECT areasymbol, musym, muname, mu.mukey/1  AS MUKEY,\n"\
-##            " (SELECT TOP 1 ROUND (AVG(interphr) over(partition by interphrc),2)\n"\
-##            " FROM mapunit\n"\
-##            " INNER JOIN component ON component.mukey=mapunit.mukey\n"\
-##            " INNER JOIN cointerp ON component.cokey = cointerp.cokey AND mapunit.mukey = mu.mukey AND ruledepth = 0 AND mrulename LIKE " +interp+ " GROUP BY interphrc, interphr\n"\
-##            " ORDER BY SUM (comppct_r) DESC)as rating,\n"\
-##            " (SELECT TOP 1 interphrc\n"\
-##            " FROM mapunit\n"\
-##            " INNER JOIN component ON component.mukey=mapunit.mukey\n"\
-##            " INNER JOIN cointerp ON component.cokey = cointerp.cokey AND mapunit.mukey = mu.mukey AND ruledepth = 0 AND mrulename LIKE " +interp+ "\n"+\
-##            " GROUP BY interphrc, comppct_r ORDER BY SUM(comppct_r) over(partition by interphrc) DESC) as class\n"\
-##            " FROM legend  AS l\n"\
-##            " INNER JOIN  mapunit AS mu ON mu.lkey = l.lkey AND l.areasymbol LIKE '" +areaSym+ "'\n"+\
-##            " INNER JOIN  component AS c ON c.mukey = mu.mukey AND c.cokey =\n"\
-##            " (SELECT TOP 1 c1.cokey FROM component AS c1\n"\
-##            " INNER JOIN mapunit ON c.mukey=mapunit.mukey AND c1.mukey=mu.mukey ORDER BY c1.comppct_r DESC, c1.cokey)\n"\
-##            " ORDER BY areasymbol, musym, muname, mu.mukey\n"
         elif aggMethod == "Weighted Average":
             interpQry = """SELECT areasymbol, musym, muname, mu.mukey/1  AS MUKEY,
                 (SELECT TOP 1 CASE WHEN ruledesign = 1 THEN 'limitation'
@@ -191,43 +229,6 @@ def getIntrps(interp, areaSym, aggMethod):
                 WHEN design = 'limitation' AND  ROUND ((rating/sum_com),2)  = 1 THEN 'Very limited' END AS class, reason
                 FROM #main
                 DROP TABLE #main"""
-##            "SELECT\n"\
-##            " areasymbol, musym, muname, mu.mukey/1  AS MUKEY,\n"\
-##            " (SELECT TOP 1 CASE WHEN ruledesign = 1 THEN 'limitation'\n"\
-##            " WHEN ruledesign = 2 THEN 'suitability' END\n"\
-##            " FROM mapunit\n"\
-##            " INNER JOIN component ON component.mukey=mapunit.mukey\n"\
-##            " INNER JOIN cointerp ON component.cokey = cointerp.cokey AND mapunit.mukey = mu.mukey AND ruledepth = 0 AND mrulename LIKE " + interp+"\n"+\
-##            " GROUP BY mapunit.mukey, ruledesign) as design,\n"\
-##            " ROUND ((SELECT SUM (interphr * comppct_r)\n"\
-##            " FROM mapunit\n"\
-##            " INNER JOIN component ON component.mukey=mapunit.mukey\n"\
-##            " INNER JOIN cointerp ON component.cokey = cointerp.cokey AND mapunit.mukey = mu.mukey AND ruledepth = 0 AND mrulename LIKE " +interp+"\n"+\
-##            " GROUP BY mapunit.mukey),2) as rating,\n"\
-##            " ROUND ((SELECT SUM (comppct_r)\n"\
-##            " FROM mapunit\n"\
-##            " INNER JOIN component ON component.mukey=mapunit.mukey\n"\
-##            " INNER JOIN cointerp ON component.cokey = cointerp.cokey AND mapunit.mukey = mu.mukey AND ruledepth = 0 AND mrulename LIKE " +interp+"\n"+\
-##            " AND (interphr) IS NOT NULL GROUP BY mapunit.mukey),2) as sum_com\n"\
-##            " INTO #main\n"\
-##            " FROM legend  AS l\n"\
-##            " INNER JOIN  mapunit AS mu ON mu.lkey = l.lkey AND l.areasymbol LIKE '" +areaSym+ "'\n"\
-##            " INNER JOIN  component AS c ON c.mukey = mu.mukey\n"\
-##            " GROUP BY  areasymbol, musym, muname, mu.mukey\n"\
-##            " SELECT areasymbol, musym, muname, MUKEY, ISNULL (ROUND ((rating/sum_com),2), 99) AS rating,\n"\
-##            " CASE WHEN rating IS NULL THEN 'Not Rated'\n"\
-##            " WHEN design = 'suitability' AND  ROUND ((rating/sum_com),2) &lt; = 0 THEN 'Very Poorly Suited'\n"\
-##            " WHEN design = 'suitability' AND  ROUND ((rating/sum_com),2)  &gt; 0.001 and  ROUND ((rating/sum_com),2)  &lt;=0.333 THEN 'Poorly suited'\n"\
-##            " WHEN design = 'suitability' AND  ROUND ((rating/sum_com),2)  &gt; 0.334 and  ROUND ((rating/sum_com),2)  &lt;=0.666  THEN 'Moderately suited'\n"\
-##            " WHEN design = 'suitability' AND  ROUND ((rating/sum_com),2)  &gt; 0.667 and  ROUND ((rating/sum_com),2)  &lt;=0.999  THEN 'Moderately well suited'\n"\
-##            " WHEN design = 'suitability' AND  ROUND ((rating/sum_com),2)   = 1  THEN 'Well suited'\n"\
-##            " WHEN design = 'limitation' AND  ROUND ((rating/sum_com),2) &lt; = 0 THEN 'Not limited'\n"\
-##            " WHEN design = 'limitation' AND  ROUND ((rating/sum_com),2)  &gt; 0.001 and  ROUND ((rating/sum_com),2)  &lt;=0.333 THEN 'Slightly limited'\n"\
-##            " WHEN design = 'limitation' AND  ROUND ((rating/sum_com),2)  &gt; 0.334 and  ROUND ((rating/sum_com),2)  &lt;=0.666  THEN 'Somewhat limited'\n"\
-##            " WHEN design = 'limitation' AND  ROUND ((rating/sum_com),2)  &gt; 0.667 and  ROUND ((rating/sum_com),2)  &lt;=0.999  THEN 'Moderately limited'\n"\
-##            " WHEN design = 'limitation' AND  ROUND ((rating/sum_com),2)  = 1 THEN 'Very limited' END AS class\n"\
-##            " FROM #main"
-
 
         #arcpy.AddMessage(interpQry.replace("&gt;", ">").replace("&lt;", "<"))
         #arcpy.AddMessage(interpQry)
@@ -240,7 +241,7 @@ def getIntrps(interp, areaSym, aggMethod):
 
         # Create request using JSON, return data as JSON
         request = {}
-        request["format"] = "JSON"
+        request["format"] = "JSON+COLUMNNAME+METADATA"
         request["query"] = interpQry
 
         #json.dumps = serialize obj (request dictionary) to a JSON formatted str
@@ -267,65 +268,37 @@ def getIntrps(interp, areaSym, aggMethod):
         if "Table" in qData:
             cResponse = 'OK'
 
-            #grab the records
-            resLst = qData["Table"]
-
-            for e in resLst:
-
-                areasymbol = e[0]
-                musym = e[1]
-                muname = e[2]
-                mukey = e[3]
-                rating = e[4]
-                class_name = e[5]
-                reason = e[6]
-
-                try:
-                    rating = float(rating)
-                except:
-                    rating = None
-
-                try:
-
-                    parser = HTMLParser()
-                    reason = parser.unescape(reason)
-
-                except:
-                    reason = reason
-
-
-                #collect the results
-                funcDict[mukey] = mukey, int(mukey), areasymbol, musym, muname, rating, class_name, reason
-
-        return True, funcDict, cResponse
-
-
+            return True, qData, cResponse
+        else:
+            cResponse = 'Failed'
+            return False, None
 
     except socket.timeout as e:
         Msg = 'Soil Data Access timeout error'
-        return False, Msg, None
+        return False, None, Msg
 
     except socket.error as e:
         Msg = 'Socket error: ' + str(e)
-        return False, Msg, None
+        return False, None, Msg
 
     except HTTPError as e:
         Msg = 'HTTP Error: ' + str(e)
-        return False, Msg, None
+        return False, None, Msg
 
     except URLError as e:
         Msg = 'URL Error: ' + str(e)
-        return False, Msg, None
+        return False, None, Msg
 
     except:
         errorMsg()
         Msg = 'Unknown error collecting interpreations for ' + eSSA
-        return False, Msg, None
+        return False, None, Msg
 
 #===============================================================================
 
 import arcpy, sys, os, traceback, time, urllib2, json
-from HTMLParser import HTMLParser
+
+#from HTMLParser import HTMLParser
 
 
 arcpy.env.overwriteOutput = True
@@ -348,13 +321,11 @@ elif aggMethod == 'Weighted Average':
     aggMod = '_wtd_avg'
 else:
     raise ForceExit('unable to determine aggregation method')
-#AddMsgAndPrint(aggMethod)
 
 try:
 
     areaList = areaParam.split(";")
     interpLst = interpParam.split(";")
-
 
     failInterps = list()
 
@@ -365,7 +336,11 @@ try:
 
     #loop through the lists
     for interp in interpLst:
-        compDict = dict()
+
+        outTbl = arcpy.ValidateTableName(interp)
+        outTbl = outTbl.replace("__", "_")
+        tblName = 'tbl_' + outTbl + aggMod
+
         if interp.find("{:}") <> -1:
             interp = interp.replace("{:}", ";")
 
@@ -374,73 +349,100 @@ try:
             arcpy.SetProgressorLabel('Collecting ' + interp + ' for: ' + eSSA + " (" + str(n) + ' of ' + str(jobCnt)+ ')')
 
             #send the request
-            gI1, gI2, gI3 = getIntrps(interp, eSSA, aggMethod)
+            intrpLogic, intrpData, intrpMsg = getIntrps(interp, eSSA, aggMethod)
 
             #if it was successful...
-            if gI1:
-                if len(gI2) == 0:
-                    AddMsgAndPrint('Response for ' + interp + ' on ' + eSSA + ' = ' + gI3)
+            if intrpLogic:
+                if len(intrpData) == 0:
                     AddMsgAndPrint('No records returned for ' + eSSA + ': ' + interp, 1)
                     failInterps.append(eSSA + ":" + interp)
                 else:
-                    AddMsgAndPrint('Response for ' + interp + ' on ' + eSSA + ' = ' + gI3)
-                    for k,v in gI2.iteritems():
-                            compDict[k] = v
-                    arcpy.SetProgressorPosition()
+                    AddMsgAndPrint('Response for ' + interp + ' on ' + eSSA + ' = ' + intrpMsg)
+
+                    intRes = intrpData["Table"]
+                    # arcpy.AddMessage(propRes)
+
+                    if not arcpy.Exists(WS + os.sep + tblName):
+
+                        columnNames = intRes.pop(0)
+                        columnInfo = intRes.pop(0)
+
+                        newTable = CreateNewTable(tblName, columnNames, columnInfo)
+
+                        with arcpy.da.InsertCursor(newTable, columnNames) as cursor:
+                            for row in intRes:
+                                cursor.insertRow(row)
+
+                        # convert from in-memory to table on disk
+                        arcpy.conversion.TableToTable(newTable, WS, tblName)
+
+                        arcpy.SetProgressorPosition()
+
+                    else:
+                        columnNames = intRes.pop(0)
+                        columnInfo = intRes.pop(0)
+
+                        with arcpy.da.InsertCursor(WS + os.sep + tblName, columnNames) as cursor:
+                            for row in intRes:
+                                cursor.insertRow(row)
+
+                        arcpy.SetProgressorPosition()
 
             #if it was unsuccessful...
             else:
                 #try again
                 #AddMsgAndPrint('Failed first attempt running ' + interp + ' for ' + eSSA + '. Resubmitting request.', 1)
-                gI1, gI2, gI3 = getIntrps(interp, eSSA, aggMethod)
-
-                #if 2nd run was successful
-                if gI1:
-                    if len(gI2) == 0:
+                intrpLogic, intrpData, intrpMsg = getIntrps(interp, eSSA, aggMethod)
+                if intrpLogic:
+                    if len(intrpData) == 0:
                         AddMsgAndPrint('No records returned for ' + eSSA + ': ' + interp, 1)
                         failInterps.append(eSSA + ":" + interp)
                     else:
-                        AddMsgAndPrint('Response for ' + interp + ' on ' + eSSA + ' = ' + gI3 + ' - 2nd attempt')
-                        for k,v in gI2.iteritems():
-                            compDict[k] = v
-                        arcpy.SetProgressorPosition()
+                        AddMsgAndPrint('Response for ' + interp + ' on ' + eSSA + ' = ' + intrpMsg + ' - 2nd attempt')
+
+                        intRes = intrpData["Table"]
+                        # arcpy.AddMessage(propRes)
+
+                        if not arcpy.Exists(WS + os.sep + tblName):
+
+                            columnNames = intRes.pop(0)
+                            columnInfo = intRes.pop(0)
+
+                            newTable = CreateNewTable(tblName, columnNames, columnInfo)
+
+                            with arcpy.da.InsertCursor(newTable, columnNames) as cursor:
+                                for row in intRes:
+                                    cursor.insertRow(row)
+
+                            # convert from in-memory to table on disk
+                            arcpy.conversion.TableToTable(newTable, WS, tblName)
+
+                            arcpy.SetProgressorPosition()
+
+                        else:
+                            columnNames = intRes.pop(0)
+                            columnInfo = intRes.pop(0)
+
+                            with arcpy.da.InsertCursor(WS + os.sep + tblName, columnNames) as cursor:
+                                for row in intRes:
+                                    cursor.insertRow(row)
+
+                            arcpy.SetProgressorPosition()
 
                 #if 2nd run was unsuccesful that's' it
                 else:
-                    AddMsgAndPrint(gI2)
+                    AddMsgAndPrint('Response for ' + interp + ' on ' + eSSA + ' = ' + intrpMsg + ' - 2nd attempt')
                     failInterps.append(eSSA + ":" + interp)
                     arcpy.SetProgressorPosition()
 
-        if len(compDict) > 0:
-            #create the geodatabase output tables
-            #clean up the interp rule name to use as output table name
-            outTbl = arcpy.ValidateTableName(interp)
-            outTbl = outTbl.replace("__", "_")
-            tblName =  'tbl_' + outTbl + aggMod
-            jTbl = WS + os.sep + 'tbl_' + outTbl + aggMod
 
-            #fields list for cursor
-            fldLst = ['MUKEY', 'int_MUKEY', 'areasymbol', 'musym', 'muname', 'rating', 'class', 'reason']
 
-            #define the template table delivered with the tool
-            template_table = srcDir + os.sep + 'templates.gdb' + os.sep + 'template_table'
-            arcpy.management.CreateTable(WS, tblName, template_table)
 
-            #populate the table
-            cursor = arcpy.da.InsertCursor(jTbl, fldLst)
-
-            for value in compDict:
-                row = compDict.get(value)
-                cursor.insertRow(row)
-
-            del cursor
-            del compDict
-
-        else:
-            AddMsgAndPrint('\n \nNo data returned for ' + interp)
 
 
     if jLayer != "":
+
+        jTbl = WS + os.sep + tblName
 
         try:
             mxd = arcpy.mapping.MapDocument("CURRENT")

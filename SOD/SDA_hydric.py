@@ -56,12 +56,70 @@ def errorMsg():
         AddMsgAndPrint("Unhandled error in errorMsg method", 2)
         pass
 
+def CreateNewTable(newTable, columnNames, columnInfo):
+    # Create new table. Start with in-memory and then export to geodatabase table
+    #
+    # ColumnNames and columnInfo come from the Attribute query JSON string
+    # MUKEY would normally be included in the list, but it should already exist in the output featureclass
+    #
+    try:
+        # Dictionary: SQL Server to FGDB
+        dType = dict()
+
+        dType["int"] = "long"
+        dType["smallint"] = "short"
+        dType["bit"] = "short"
+        dType["varbinary"] = "blob"
+        dType["nvarchar"] = "text"
+        dType["varchar"] = "text"
+        dType["char"] = "text"
+        dType["datetime"] = "date"
+        dType["datetime2"] = "date"
+        dType["smalldatetime"] = "date"
+        dType["decimal"] = "double"
+        dType["numeric"] = "double"
+        dType["float"] = "double"
+
+        # numeric type conversion depends upon the precision and scale
+        dType["numeric"] = "float"  # 4 bytes
+        dType["real"] = "double"  # 8 bytes
+
+        # Iterate through list of field names and add them to the output table
+        i = 0
+
+        # ColumnInfo contains:
+        # ColumnOrdinal, ColumnSize, NumericPrecision, NumericScale, ProviderType, IsLong, ProviderSpecificDataType, DataTypeName
+        # PrintMsg(" \nFieldName, Length, Precision, Scale, Type", 1)
+
+        joinFields = list()
+        outputTbl = os.path.join("IN_MEMORY", os.path.basename(newTable))
+        arcpy.CreateTable_management(os.path.dirname(outputTbl), os.path.basename(outputTbl))
+
+        for i, fldName in enumerate(columnNames):
+            vals = columnInfo[i].split(",")
+            length = int(vals[1].split("=")[1])
+            precision = int(vals[2].split("=")[1])
+            scale = int(vals[3].split("=")[1])
+            dataType = dType[vals[4].lower().split("=")[1]]
+
+            if fldName.lower().endswith("key"):
+                # Per SSURGO standards, key fields should be string. They come from Soil Data Access as long integer.
+                dataType = 'text'
+                length = 30
+
+            arcpy.AddField_management(outputTbl, fldName, dataType, precision, scale, length)
+
+        return outputTbl
+
+    except:
+        errorMsg()
+    return False
 
 
 def getHyd(areaSym):
 
     import socket
-
+    from urllib2 import HTTPError, URLError
     funcDict = dict()
 
     try:
@@ -126,7 +184,7 @@ def getHyd(areaSym):
 
         # Create request using JSON, return data as JSON
         request = {}
-        request["format"] = "JSON"
+        request["format"] = "JSON+COLUMNNAME+METADATA"
         request["query"] = hydQry
 
         #json.dumps = serialize obj (request dictionary) to a JSON formatted str
@@ -156,31 +214,29 @@ def getHyd(areaSym):
 
         # if dictionary key "Table" is found
         if "Table" in qData:
+            cResponse = 'OK'
 
+            return True, qData, cResponse
 
-            # get its value
-            # a list of lists
-            resLst = qData["Table"]
-
-            for res in resLst:
-                #insert integer copy of mukey into list at position 3
-                res.insert(2, int(res[1]))
-
-
-                #put the list for each mapunit into a dictionary.  dict keys are mukeys.
-                funcDict[res[1]] = res
-
-        return True, funcDict, cResponse
-
-
+        else:
+            cResponse = 'Failed'
+            return False, None, cResponse
 
     except socket.timeout as e:
         Msg = 'Soil Data Access timeout error'
-        return False, Msg, None
+        return False, None, Msg
 
     except socket.error as e:
         Msg = 'Socket error: ' + str(e)
-        return False, Msg, None
+        return False, None, Msg
+
+    except HTTPError as e:
+        Msg = 'HTTP Error' + str(e)
+        return False, None, Msg
+
+    except URLError as e:
+        Msg = 'URL Error' + str(e)
+        return False, None, Msg
 
     except:
         errorMsg()
@@ -204,103 +260,119 @@ jLayer = arcpy.GetParameterAsText(3)
 #arcpy.AddMessage(nullParam)
 srcDir = os.path.dirname(sys.argv[0])
 
-#ordLst = ['AREASYMBOL', 'MUKEY', 'MUSYM', 'MUNAME', 'HYDRIC_RATING']
-
 try:
     areaList = areaParam.split(";")
 
-    failPM = list()
+    failHyd = list()
 
     jobCnt = len(areaList)
 
     n=0
+    
     arcpy.SetProgressor('step', 'Starting Parent Material Group Name Tool...', 0, jobCnt, 1)
 
-    compDict = dict()
+    tblName = "SOD_hydricrating"
+    
 
     for eSSA in areaList:
         n = n + 1
         arcpy.SetProgressorLabel('Collecting parent material table for: ' + eSSA + " (" + str(n) + ' of ' + str(jobCnt) + ')')
 
         #send the request
-        #True, funcDict, cResponse
-        gP1, gP2, gP3 = getHyd(eSSA)
+        hydLogic, hydData, hydMsg = getHyd(eSSA)
 
         #if it was successful...
-        if gP1:
-            if len(gP2) == 0:
+        if hydLogic:
+            if len(hydData) == 0:
                 AddMsgAndPrint('No records returned for ' + eSSA, 1)
-                failPM.append(eSSA )
+                failHyd.append(eSSA )
                 arcpy.SetProgressorPosition()
             else:
-                AddMsgAndPrint('Response for hydric summary request on ' + eSSA + ' = ' + gP3)
-                for k,v in gP2.iteritems():
-                    compDict[k] = v
-                arcpy.SetProgressorPosition()
+                AddMsgAndPrint('Response for hydric summary request on ' + eSSA + ' = ' + hydMsg)
+                hydRes = hydData["Table"]
+
+                if not arcpy.Exists(WS + os.sep + tblName):
+
+                    columnNames = hydRes.pop(0)
+                    columnInfo = hydRes.pop(0)
+
+                    newTable = CreateNewTable(tblName, columnNames, columnInfo)
+
+                    with arcpy.da.InsertCursor(newTable, columnNames) as cursor:
+                        for row in hydRes:
+                            cursor.insertRow(row)
+
+                    # convert from in-memory to table on disk
+                    arcpy.conversion.TableToTable(newTable, WS, tblName)
+
+                    arcpy.SetProgressorPosition()
+
+                else:
+                    columnNames = hydRes.pop(0)
+                    columnInfo = hydRes.pop(0)
+
+                    with arcpy.da.InsertCursor(WS + os.sep + tblName, columnNames) as cursor:
+                        for row in hydRes:
+                            cursor.insertRow(row)
+
+                    arcpy.SetProgressorPosition()
 
         #if it was unsuccessful...
         else:
             #try again
-            gP1, gP2, gP3 = getHyd(eSSA)
+            hydLogic, hydData, hydMsg = getHyd(eSSA)
 
             #if 2nd run was successful
-            if gP1:
-                if len(gP2) == 0:
+            if hydLogic:
+                if len(hydData) == 0:
                     AddMsgAndPrint('No records returned for ' + eSSA , 1)
-                    failPM.append(eSSA )
+                    failHyd.append(eSSA )
                     arcpy.SetProgressorPosition()
                 else:
-                    AddMsgAndPrint('Response for hydric summary request on '  + eSSA + ' = ' + gP3 + ' - 2nd attempt')
-                    for k,v in gP2.iteritems():
-                        compDict[k] = v
-                    arcpy.SetProgressorPosition()
+                    AddMsgAndPrint('Response for hydric summary request on '  + eSSA + ' = ' + hydMsg + ' - 2nd attempt')
+                    hydRes = hydData["Table"]
+
+                    if not arcpy.Exists(WS + os.sep + tblName):
+
+                        columnNames = hydRes.pop(0)
+                        columnInfo = hydRes.pop(0)
+
+                        newTable = CreateNewTable(tblName, columnNames, columnInfo)
+
+                        with arcpy.da.InsertCursor(newTable, columnNames) as cursor:
+                            for row in hydRes:
+                                cursor.insertRow(row)
+
+                        # convert from in-memory to table on disk
+                        arcpy.conversion.TableToTable(newTable, WS, tblName)
+
+                        arcpy.SetProgressorPosition()
+
+                    else:
+                        columnNames = hydRes.pop(0)
+                        columnInfo = hydRes.pop(0)
+
+                        with arcpy.da.InsertCursor(WS + os.sep + tblName, columnNames) as cursor:
+                            for row in hydRes:
+                                cursor.insertRow(row)
+
+                        arcpy.SetProgressorPosition()
 
             #if 2nd run was unsuccesful that's' it
             else:
-                AddMsgAndPrint(gP3)
-                failPM.append(eSSA)
+                AddMsgAndPrint('Response for hydric summary request on '  + eSSA + ' = ' + hydMsg + ' - 2nd attempt')
+                failHyd.append(eSSA)
                 arcpy.SetProgressorPosition()
 
     arcpy.AddMessage('\n')
 ##########################################################################################################
-    if len(compDict) > 0:
-        #create the geodatabase output tables
-        tblName = "SOD_hydricrating"
-
-        jTbl = WS + os.sep  + tblName
-
-        #fields list for cursor
-        fldLst = ['AREASYMBOL', 'MUKEY', 'int_MUKEY', 'MUSYM', 'MUNAME', 'HYDRIC_RATING']
-
-
-        #define the template table delivered with the tool
-        template_table = srcDir + os.sep + 'templates.gdb' + os.sep + 'hydric_template'
-
-
-        arcpy.management.CreateTable(WS, tblName, template_table)
-
-
-        #populate the table
-        cursor = arcpy.da.InsertCursor(jTbl, fldLst)
-
-        for value in compDict:
-
-            row = compDict.get(value)
-            cursor.insertRow(row)
-
-        del cursor
-        del compDict
-
-    else:
-        arcpy.AddMessage(r'No data to build parent material table\n')
 
     if jLayer != "":
 
         try:
             mxd = arcpy.mapping.MapDocument("CURRENT")
-            dfs = arcpy.mapping.ListDataFrames(mxd, "*")[0]
-
-            objLyr = arcpy.mapping.ListLayers(mxd, jLayer, dfs)
+            df = mxd.activeDataFrame
+            objLyr = arcpy.mapping.ListLayers(mxd, jLayer, df)
             refLyr = objLyr[0]
             desc = arcpy.Describe(jLayer)
             dType = desc.dataType.upper()
@@ -311,26 +383,27 @@ try:
                 arcpy.env.addOutputsToMap = True
                 AddMsgAndPrint('\n \nReloading ' + jLayer + ' due to existing join')
                 if dType == 'RASTERLAYER':
-                    arcpy.mapping.RemoveLayer(dfs, refLyr)
+                    arcpy.mapping.RemoveLayer(df, refLyr)
                     arcpy.MakeRasterLayer_management(path, bName)
-                    arcpy.management.AddJoin(bName, "MUKEY", jTbl, "MUKEY")
+                    arcpy.management.AddJoin(bName, "MUKEY", os.path.join(WS,tblName), "MUKEY")
                     AddMsgAndPrint('\n \nAdded join to ' + jLayer)
                 elif dType == 'FEATURELAYER':
-                    arcpy.mapping.RemoveLayer(dfs, refLyr)
+                    arcpy.mapping.RemoveLayer(df, refLyr)
                     arcpy.MakeFeatureLayer_management(path, bName)
-                    arcpy.management.AddJoin(bName, "MUKEY", jTbl, "MUKEY")
+                    arcpy.management.AddJoin(bName, "MUKEY", os.path.join(WS,tblName), "MUKEY")
                     AddMsgAndPrint('\n \nAdded join to ' + jLayer)
             else:
-                arcpy.management.AddJoin(jLayer, "MUKEY", jTbl, "MUKEY")
+                arcpy.management.AddJoin(jLayer, "MUKEY", os.path.join(WS,tblName), "MUKEY")
                 AddMsgAndPrint('\n \nAdded join to ' + jLayer)
 
         except:
+            errorMsg()
             AddMsgAndPrint('\n \nUnable to make join to ' + jLayer)
 
 
-    if len(failPM) > 0:
+    if len(failHyd) > 0:
         AddMsgAndPrint('\n \nThe following interpretations either failed or collected no records:', 1)
-        for f in failPM:
+        for f in failHyd:
             AddMsgAndPrint(f)
 
 
