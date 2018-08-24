@@ -57,15 +57,73 @@ def errorMsg():
         pass
 
 
+def CreateNewTable(newTable, columnNames, columnInfo):
+    # Create new table. Start with in-memory and then export to geodatabase table
+    #
+    # ColumnNames and columnInfo come from the Attribute query JSON string
+    # MUKEY would normally be included in the list, but it should already exist in the output featureclass
+    #
+    try:
+        # Dictionary: SQL Server to FGDB
+        dType = dict()
 
-def getPMgrp(areaSym, ordLst, dBool):
+        dType["int"] = "long"
+        dType["smallint"] = "short"
+        dType["bit"] = "short"
+        dType["varbinary"] = "blob"
+        dType["nvarchar"] = "text"
+        dType["varchar"] = "text"
+        dType["char"] = "text"
+        dType["datetime"] = "date"
+        dType["datetime2"] = "date"
+        dType["smalldatetime"] = "date"
+        dType["decimal"] = "double"
+        dType["numeric"] = "double"
+        dType["float"] = "double"
+
+        # numeric type conversion depends upon the precision and scale
+        dType["numeric"] = "float"  # 4 bytes
+        dType["real"] = "double"  # 8 bytes
+
+        # Iterate through list of field names and add them to the output table
+        i = 0
+
+        # ColumnInfo contains:
+        # ColumnOrdinal, ColumnSize, NumericPrecision, NumericScale, ProviderType, IsLong, ProviderSpecificDataType, DataTypeName
+        # PrintMsg(" \nFieldName, Length, Precision, Scale, Type", 1)
+
+        joinFields = list()
+        outputTbl = os.path.join("IN_MEMORY", os.path.basename(newTable))
+        arcpy.CreateTable_management(os.path.dirname(outputTbl), os.path.basename(outputTbl))
+
+        for i, fldName in enumerate(columnNames):
+            vals = columnInfo[i].split(",")
+            length = int(vals[1].split("=")[1])
+            precision = int(vals[2].split("=")[1])
+            scale = int(vals[3].split("=")[1])
+            dataType = dType[vals[4].lower().split("=")[1]]
+
+            if fldName.lower().endswith("key"):
+                # Per SSURGO standards, key fields should be string. They come from Soil Data Access as long integer.
+                dataType = 'text'
+                length = 30
+
+            arcpy.AddField_management(outputTbl, fldName, dataType, precision, scale, length)
+
+        return outputTbl
+
+    except:
+        errorMsg()
+    return False
+
+
+def getPMgrp(areaSym, dBool):
 
     import socket
     from BaseHTTPServer import BaseHTTPRequestHandler as bhrh
+    from urllib2 import HTTPError, URLError
 
     try:
-
-        funcDict = dict()
 
         if dBool == "true":
             pmQry = \
@@ -223,7 +281,7 @@ def getPMgrp(areaSym, ordLst, dBool):
 
         # Create request using JSON, return data as JSON
         request = {}
-        request["format"] = "JSON"
+        request["format"] = "JSON+COLUMNNAME+METADATA"
         request["query"] = pmQry
 
         #json.dumps = serialize obj (request dictionary) to a JSON formatted str
@@ -250,37 +308,34 @@ def getPMgrp(areaSym, ordLst, dBool):
 
         # if dictionary key "Table" is found
         if "Table" in qData:
+            cResponse = 'OK'
 
-            # get its value
-            # a list of lists
-            resLst = qData["Table"]
-
-            #for each list in the list
-            for res in resLst:
-
-                #insert integer copy of mukey into list at position 3
-                res.insert(2, int(res[1]))
-
-
-                #put the list for each mapunit into a dictionary.  dict keys are mukeys.
-                funcDict[res[1]] = res
-
-        return True, funcDict, cResponse
-
+            return True, qData, cResponse
+        else:
+            cResponse = 'Failed'
+            return False, None, cResponse
 
 
     except socket.timeout as e:
         Msg = 'Soil Data Access timeout error'
-        return False, Msg, None
+        return False, None, Msg
 
     except socket.error as e:
         Msg = 'Socket error: ' + str(e)
-        return False, Msg, None
+        return False, None, Msg
+
+    except HTTPError as e:
+        Msg = 'HTTP Error: ' + str(e)
+        return False, None, Msg
+
+    except URLError as e:
+        Msg = 'URL Error: ' + str(e)
+        return False, None, Msg
 
     except:
         errorMsg()
         Msg = 'Unknown error collecting interpreations for ' + eSSA
-        return False, Msg, None
+        return False, None, Msg
 
 #===============================================================================
 
@@ -300,7 +355,7 @@ jLayer = arcpy.GetParameterAsText(4)
 #arcpy.AddMessage(nullParam)
 srcDir = os.path.dirname(sys.argv[0])
 
-ordLst = ['areasymbol', 'mukey', 'musym', 'muname', 'compname', 'comppct_r', 'pmgroupname']
+tblName = "SOD_pmgrpname"
 
 try:
     areaList = areaParam.split(";")
@@ -320,73 +375,95 @@ try:
 
         #send the request
         #True, funcDict, cResponse
-        gP1, gP2, gP3 = getPMgrp(eSSA, ordLst, dBool)
+        pmLogic, pmData, pmMsg = getPMgrp(eSSA, dBool)
 
         #if it was successful...
-        if gP1:
-            if len(gP2) == 0:
+        if pmLogic:
+            if len(pmData) == 0:
                 AddMsgAndPrint('No records returned for ' + eSSA, 1)
                 failPM.append(eSSA )
                 arcpy.SetProgressorPosition()
             else:
-                AddMsgAndPrint('Response for parent material table request on ' + eSSA + ' = ' + gP3)
-                for k,v in gP2.iteritems():
-                    compDict[k] = v
-                arcpy.SetProgressorPosition()
+                AddMsgAndPrint('Response for parent material table request on ' + eSSA + ' = ' + pmMsg)
+                pmRes = pmData["Table"]
+
+                if not arcpy.Exists(WS + os.sep + tblName):
+
+                    columnNames = pmRes.pop(0)
+                    columnInfo = pmRes.pop(0)
+
+                    newTable = CreateNewTable(tblName, columnNames, columnInfo)
+
+                    with arcpy.da.InsertCursor(newTable, columnNames) as cursor:
+                        for row in pmRes:
+                            cursor.insertRow(row)
+
+                    # convert from in-memory to table on disk
+                    arcpy.conversion.TableToTable(newTable, WS, tblName)
+
+                    arcpy.SetProgressorPosition()
+
+                else:
+                    columnNames = pmRes.pop(0)
+                    columnInfo = pmRes.pop(0)
+
+                    with arcpy.da.InsertCursor(WS + os.sep + tblName, columnNames) as cursor:
+                        for row in pmRes:
+                            cursor.insertRow(row)
+
+                    arcpy.SetProgressorPosition()
 
         #if it was unsuccessful...
         else:
             #try again
-            gP1, gP2, gP3 = getPMgrp(eSSA, ordLst, dBool)
+            pmLogic, pmData, pmMsg = getPMgrp(eSSA, ordLst, dBool)
 
             #if 2nd run was successful
-            if gP1:
-                if len(gP2) == 0:
+            if pmLogic:
+                if len(pmData) == 0:
                     AddMsgAndPrint('No records returned for ' + eSSA , 1)
                     failPM.append(eSSA )
                     arcpy.SetProgressorPosition()
                 else:
-                    AddMsgAndPrint('Response for parent material table request on '  + eSSA + ' = ' + gP3 + ' - 2nd attempt')
-                    for k,v in gP2.iteritems():
-                        compDict[k] = v
-                    arcpy.SetProgressorPosition()
+                    AddMsgAndPrint('Response for parent material table request on '  + eSSA + ' = ' + pmMsg + ' - 2nd attempt')
+                    pmRes = pmData["Table"]
+
+                    if not arcpy.Exists(WS + os.sep + tblName):
+
+                        columnNames = pmRes.pop(0)
+                        columnInfo = pmRes.pop(0)
+
+                        newTable = CreateNewTable(tblName, columnNames, columnInfo)
+
+                        with arcpy.da.InsertCursor(newTable, columnNames) as cursor:
+                            for row in pmRes:
+                                cursor.insertRow(row)
+
+                        # convert from in-memory to table on disk
+                        arcpy.conversion.TableToTable(newTable, WS, tblName)
+
+                        arcpy.SetProgressorPosition()
+
+                    else:
+                        columnNames = pmRes.pop(0)
+                        columnInfo = pmRes.pop(0)
+
+                        with arcpy.da.InsertCursor(WS + os.sep + tblName, columnNames) as cursor:
+                            for row in pmRes:
+                                cursor.insertRow(row)
+
+                        arcpy.SetProgressorPosition()
 
             #if 2nd run was unsuccesful that's' it
             else:
-                AddMsgAndPrint(gP3)
+                AddMsgAndPrint('Response for parent material table request on '  + eSSA + ' = ' + pmMsg + ' - 2nd attempt')
                 failPM.append(eSSA)
                 arcpy.SetProgressorPosition()
 
     arcpy.AddMessage('\n')
 ##########################################################################################################
-    if len(compDict) > 0:
-        #create the geodatabase output tables
-        tblName = "SOD_pmgrpname"
 
-        jTbl = WS + os.sep  + tblName
-
-        #fields list for cursor
-        fldLst = ['AREASYMBOL', 'MUKEY', 'int_MUKEY', 'MUSYM', 'MUNAME', 'COMPNAME', 'COMPPCT_R', 'PARENT_MATERIAL']
-
-
-        #define the template table delivered with the tool
-        template_table = srcDir + os.sep + 'templates.gdb' + os.sep + 'pmgrp_template'
-
-        arcpy.management.CreateTable(WS, tblName, template_table)
-
-        #populate the table
-        cursor = arcpy.da.InsertCursor(jTbl, fldLst)
-
-        for value in compDict:
-
-            row = compDict.get(value)
-            cursor.insertRow(row)
-
-        del cursor
-        del compDict
-
-    else:
-        arcpy.AddMessage(r'No data to build parent material table\n')
+    jTbl = WS + os.sep  + tblName
 
     if jLayer != "":
 

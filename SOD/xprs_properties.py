@@ -39,7 +39,6 @@ def PrintMsg(msg, severity=0):
         pass
 
 
-
 def errorMsg():
     try:
         tb = sys.exc_info()[2]
@@ -50,6 +49,67 @@ def errorMsg():
     except:
         PrintMsg("Unhandled error in errorMsg method", 2)
         pass
+
+
+def CreateNewTable(newTable, columnNames, columnInfo):
+    # Create new table. Start with in-memory and then export to geodatabase table
+    #
+    # ColumnNames and columnInfo come from the Attribute query JSON string
+    # MUKEY would normally be included in the list, but it should already exist in the output featureclass
+    #
+    try:
+        # Dictionary: SQL Server to FGDB
+        dType = dict()
+
+        dType["int"] = "long"
+        dType["smallint"] = "short"
+        dType["bit"] = "short"
+        dType["varbinary"] = "blob"
+        dType["nvarchar"] = "text"
+        dType["varchar"] = "text"
+        dType["char"] = "text"
+        dType["datetime"] = "date"
+        dType["datetime2"] = "date"
+        dType["smalldatetime"] = "date"
+        dType["decimal"] = "double"
+        dType["numeric"] = "double"
+        dType["float"] = "double"
+
+        # numeric type conversion depends upon the precision and scale
+        dType["numeric"] = "float"  # 4 bytes
+        dType["real"] = "double"  # 8 bytes
+
+        # Iterate through list of field names and add them to the output table
+        i = 0
+
+        # ColumnInfo contains:
+        # ColumnOrdinal, ColumnSize, NumericPrecision, NumericScale, ProviderType, IsLong, ProviderSpecificDataType, DataTypeName
+        # PrintMsg(" \nFieldName, Length, Precision, Scale, Type", 1)
+
+        joinFields = list()
+        outputTbl = os.path.join("IN_MEMORY", os.path.basename(newTable))
+        arcpy.CreateTable_management(os.path.dirname(outputTbl), os.path.basename(outputTbl))
+
+        for i, fldName in enumerate(columnNames):
+            vals = columnInfo[i].split(",")
+            length = int(vals[1].split("=")[1])
+            precision = int(vals[2].split("=")[1])
+            scale = int(vals[3].split("=")[1])
+            dataType = dType[vals[4].lower().split("=")[1]]
+
+            if fldName.lower().endswith("key"):
+                # Per SSURGO standards, key fields should be string. They come from Soil Data Access as long integer.
+                dataType = 'text'
+                length = 30
+
+            arcpy.AddField_management(outputTbl, fldName, dataType, precision, scale, length)
+
+        return outputTbl
+
+    except:
+        errorMsg()
+    return False
+
 
 def rslvProps(aProp):
     try:
@@ -66,32 +126,11 @@ def rslvProps(aProp):
 
 def geoRequest(aoi):
 
-     try:
-
-        if descWsType == '':
-            geoExt = '.shp'
-        else:
-            geoExt = ''
+    try:
 
         sr = arcpy.SpatialReference(4326)
-        arcpy.management.CreateFeatureclass(outLoc, "SSURGO_express_properties" + geoExt, "POLYGON", None, None, None, sr)
-        arcpy.management.AddField(outLoc + os.sep + "SSURGO_express_properties" + geoExt, "mukey", "TEXT", None, None, "30")
-
-##        gQry = """ --   Define a AOI in WGS84
-##        ~DeclareGeometry(@aoi)~
-##        select @aoi = geometry::STPolyFromText('polygon(( """ + aoi + """))', 4326)\n
-##
-##        --   Extract all intersected polygons
-##        ~DeclareIdGeomTable(@intersectedPolygonGeometries)~
-##        ~GetClippedMapunits(@aoi,polygon,geo,@intersectedPolygonGeometries)~
-##
-##        --   Convert geometries to geographies so we can get areas
-##        ~DeclareIdGeogTable(@intersectedPolygonGeographies)~
-##        ~GetGeogFromGeomWgs84(@intersectedPolygonGeometries,@intersectedPolygonGeographies)~
-##
-##        --   Return the polygonal geometries
-##        select * from intersectedPolygonGeometries
-##        where geog.STGeometryType() = 'Polygon'"""
+        arcpy.management.CreateFeatureclass(outLoc, "SSURGO_express_properties", "POLYGON", None, None, None, sr)
+        arcpy.management.AddField(outLoc + os.sep + "SSURGO_express_properties", "mukey", "TEXT", None, None, "30")
 
 
         gQry = """~DeclareGeometry(@aoi)~
@@ -137,26 +176,13 @@ def geoRequest(aoi):
         # get rid of objects
         del qResults, response, req
 
-
-        funcDict = dict()
-
         # if dictionary key "Table" is found
         if "Table" in qData:
 
             # get its value
             resLst = qData["Table"]  # Data as a list of lists. All values come back as string.
 
-##        #msg =  "Geometry Response time = {}\n".format((time.time() - startTime))[:-6]
-##        if cStatus == 200:
-##            msg = "AOI collected successfully"
-##            arcpy.AddMessage(msg + '\n')
-##        else:
-##            msg = "Error collecting AOI: " + str(cStatus) + "=" + cResponse
-##            return False, msg
-
-
-
-        rows =  arcpy.da.InsertCursor(outLoc + os.sep + "SSURGO_express_properties" + geoExt, ["SHAPE@WKT", "mukey"])
+        rows =  arcpy.da.InsertCursor(outLoc + os.sep + "SSURGO_express_properties", ["SHAPE@WKT", "mukey"])
 
         keyList = list()
 
@@ -172,37 +198,40 @@ def geoRequest(aoi):
             rows.insertRow(value)
 
         arcpy.AddMessage('\nReceived SSURGO polygon information successfully.\n')
+        lyr = arcpy.mapping.Layer(outLoc + os.sep + "SSURGO_express_properties")
+        mxd = arcpy.mapping.MapDocument("CURRENT")
+        df = mxd.activeDataFrame
+        arcpy.mapping.AddLayer(df, lyr)
+
 
         return True, keyList
 
-     except socket.timeout as e:
+    except socket.timeout as e:
         Msg = 'Soil Data Access timeout error'
         return False, Msg
 
-     except socket.error as e:
+    except socket.error as e:
         Msg = 'Socket error: ' + str(e)
         return False, Msg
 
-     except HTTPError as e:
+    except HTTPError as e:
         Msg = 'HTTP Error' + str(e)
         return False, Msg
 
-     except URLError as e:
+    except URLError as e:
         Msg = 'URL Error' + str(e)
         return False, Msg
 
-     except:
+    except:
         errorMsg()
         Msg = 'Unknown error collecting geometries'
         return False, Msg
 
 
-
-
 def tabRequest(aProp):
 
     #import socket
-    arcpy.AddMessage('Fetching data for ' + prop + '...')
+    #arcpy.AddMessage('Fetching data for ' + prop + '...')
 
     try:
 
@@ -368,7 +397,7 @@ def tabRequest(aProp):
 
         # Create request using JSON, return data as JSON
         request = {}
-        request["format"] = "JSON"
+        request["format"] = "JSON+COLUMNNAME+METADATA"
         request["query"] = pQry
 
         #json.dumps = serialize obj (request dictionary) to a JSON formatted str
@@ -388,341 +417,152 @@ def tabRequest(aProp):
         # get rid of objects
         del qResults, response, req
 
-        container = dict()
-
-
         # if dictionary key "Table" is found
         if "Table" in qData:
+            Msg = 'Successfully received results for ' + aProp
+            return True, qData, Msg
 
-            # get its value
-            resLst = qData["Table"]  # Data as a list of lists. All values come back as string.
-
-##        #msg =  "Geometry Response time = {}\n".format((time.time() - startTime))[:-6]
-##        if cStatus == 200:
-##            msg = "AOI collected successfully"
-##            arcpy.AddMessage(msg + '\n')
-##        else:
-##            msg = "Error collecting AOI: " + str(cStatus) + "=" + cResponse
-##            return False, msg
-
-            for e in resLst:
-
-                areasymbol = e[0]
-                musym = e[1]
-                muname = e[2]
-                mukey = e[3]
-                theProp = e[4]
-
-                try:
-                    rating = float(theProp)
-                except:
-                    if str(theProp):
-                        rating = theProp
-                else:
-                    rating = theProp
-##        #msg =  "Collected {} data ({} seconds)".format(interp, (time.time() - startTime)[:-6])
-##        msg = "Request for {} = {}".format(aProp, cResponse)
-##        arcpy.AddMessage(msg)
-##        # Convert XML to tree format
-
-
-                container[mukey] = areasymbol,musym, muname, mukey, rating
-
-##        for k,v in container.iteritems():
-##            arcpy.AddMessage(v)
-
-        return True, container
-
+        else:
+            Msg = 'No results returned for ' + aProp
+            return False, None, Msg
 
     except socket.timeout as e:
         Msg = 'Soil Data Access timeout error'
-        return False, Msg
+        return False, None, Msg
 
     except socket.error as e:
         Msg = 'Socket error: ' + str(e)
-        return False, Msg
+        return False, None, Msg
 
     except HTTPError as e:
         Msg = 'HTTP Error' + str(e)
-        return False, Msg
+        return False, None, Msg
 
     except URLError as e:
         Msg = 'URL Error' + str(e)
-        return False, Msg
+        return False, None, Msg
 
     except:
         errorMsg()
-        Msg = 'Unknown error collecting geometries'
-        return False, Msg
+        Msg = 'Unhandled error collecting geometries'
+        return False, None, Msg
 
 
-def soloTbl(sdaTab):
+def soloTbl(tbls):
 
-    #arcpy.AddMessage('Running solotable')
-    import collections
+    try:
 
-    srtDict = collections.OrderedDict(sorted(sdaTab.items()))
+        dest = os.path.dirname(tbls[0]) + os.sep + "SSURGO_express_multi_properties"
 
-    srcDir = os.path.dirname(sys.argv[0])
+        if arcpy.Exists(dest):
+            arcpy.management.Delete(dest)
 
-    aggMethod == aggMethod.replace(" ", "_")
+        arcpy.conversion.TableToTable(tbls[0], os.path.dirname(tbls[0]), "SSURGO_express_multi_properties")
 
-    #descWsType = arcpy.Describe(outLoc).workspaceFactoryProgID
+        sfs = [f.name for f in arcpy.Describe(dest).fields]
+        # fldName, dataType, precision, scale, length
+        for tbl in tbls[1:]:
 
-    template = os.path.dirname(sys.argv[0]) + os.sep + 'templates.gdb' + os.sep + 'prop_template_table_base_1'
+            for fld in arcpy.Describe(tbl).fields:
 
+                if fld.name not in sfs:
 
-    #if descWsType == '':
-    if tblExt == ".dbf":
-        if not arcpy.Exists(os.path.join(path, name + tblExt)):
-            arcpy.management.CreateTable(path, name + tblExt, template)
-    if tblExt == '':
-        if not arcpy.Exists(os.path.join(path, name + tblExt)):
-            arcpy.management.CreateTable(path, name + tblExt, template)
+                    arcpy.management.AddField(dest, fld.name, fld.type, fld.precision, fld.scale, fld.length)
 
-    #fields for cursor to look for
-    fldLst = ['areasymbol', 'musym', 'muname', 'mukey', propVal]
+                    tblDict = dict()
 
+                    with arcpy.da.SearchCursor(tbl, ["mukey", fld.name]) as rows:
+                        for row in rows:
+                            tblDict[row[0]] = row[1]
 
-    #if the property returns string values
-    if propVal in strFldLst:
+                    del row, rows
 
-        #get max length for field definition
-        n = 0
-        for eDef in srtDict:
-            theDef = srtDict.get(eDef)[4]
-            #WEG can't be numeric bc of class 4l
-            #all other values are numeric/float and don't have a len()
-            #so cast to string
-            theDef = str(theDef)
-
-            if theDef == None:
-                theDef = 'None'
-            if len(theDef) > n:
-                n = len(theDef)
-
-
-        arcpy.management.AddField(os.path.join(path, name + tblExt), propVal, "TEXT", "#", "#", str(n))
-        desc = arcpy.Describe(os.path.join(path, name + tblExt))
-        curFields = [(x.name).encode() for x in desc.fields]
-        if not 'muname' in curFields:
-
-            cursor = arcpy.da.InsertCursor(tblName + tblExt, fldLst)
-
-            for entry in srtDict:
-                row = srtDict.get(entry)
-                cursor.insertRow(row)
-
-            del cursor, row, srtDict, n
-
-        else:
-
-            with arcpy.da.UpdateCursor(tblName + tblExt, ["mukey", propVal]) as cursor:
-                for row in cursor:
-                    updateVal = srtDict.get(row[0])[4]
-                    row[1] = updateVal
-                    cursor.updateRow(row)
-
-
-
-    #if the property doesn't return text
-    else:
-        arcpy.management.AddField(os.path.join(path, name + tblExt), propVal, "FLOAT")
-        fldCnt = arcpy.Describe(os.path.join(path, name + tblExt)).fields
-        if len(fldCnt) < 7:
-            #arcpy.AddMessage('runnining insert cursor')
-
-            cursor = arcpy.da.InsertCursor(tblName + tblExt, fldLst)
-
-            for entry in srtDict:
-                row = srtDict.get(entry)
-
-                cursor.insertRow(row)
-
-            del cursor, row, srtDict
-
-        else:
-            #arcpy.AddMessage('runnining update cursor')
-            with arcpy.da.UpdateCursor(tblName + tblExt, ["mukey", propVal]) as cursor:
-                for row in cursor:
-                    updateVal = srtDict.get(row[0])[4]
-##                    if updateVal is None:
-##                        updateVal = -1
-                    row[1] = updateVal
-                    cursor.updateRow(row)
-
-
-
-def mkTbl(sdaTab):
-
-    import collections
-
-    srtDict = collections.OrderedDict(sorted(sdaTab.items()))
-
-    srcDir = os.path.dirname(sys.argv[0])
-
-    aggMethod == aggMethod.replace(" ", "_")
-
-    #descWsType = arcpy.Describe(outLoc).workspaceFactoryProgID
-
-    template = os.path.dirname(sys.argv[0]) + os.sep + 'templates.gdb' + os.sep + 'prop_template_table_base_1'
-
-
-    #if descWsType == '':
-    if tblExt == ".dbf":
-        arcpy.management.CreateTable(path, name + tblExt, template)
-    if tblExt == '':
-        arcpy.management.CreateTable(path, name + tblExt, template)
-
-    #fields for cursor to look for
-    fldLst = ['areasymbol', 'musym', 'muname', 'mukey', propVal]
-
-
-    #if the property returns string values
-    if propVal in strFldLst:
-
-        #get max length for field definition
-        n = 0
-        for eDef in srtDict:
-            theDef = srtDict.get(eDef)[4]
-            #WEG can't be numeric bc of class 4l
-            #all other values are numeric/float and don't have a len()
-            #so cast to string
-            theDef = str(theDef)
-
-            if theDef == None:
-                theDef = 'None'
-            if len(theDef) > n:
-                n = len(theDef)
-
-
-        arcpy.management.AddField(os.path.join(path, name + tblExt), propVal, "TEXT", "#", "#", str(n))
-        cursor = arcpy.da.InsertCursor(tblName + tblExt, fldLst)
-
-        for entry in srtDict:
-            row = srtDict.get(entry)
-            #arcpy.AddMessage(row)
-            cursor.insertRow(row)
-
-        del cursor, row, srtDict, n
-
-    #if the property doesn't return text
-    else:
-        arcpy.management.AddField(os.path.join(path, name + tblExt), propVal, "FLOAT")
-
-        cursor = arcpy.da.InsertCursor(tblName + tblExt, fldLst)
-
-        for entry in srtDict:
-            row = srtDict.get(entry)
-            cursor.insertRow(row)
-
-        del cursor, row, srtDict
-
-
-
-
-def mkGeo():
-
-    #arcpy.env.addOutputsToMap = True
-
-    inFeats = outLoc + os.sep + "SSURGO_express_properties" + geoExt
-    #outFeats = outLoc + os.sep + "SSURGO_express_prop_polys_" + name[19:] + geoExt
-
-    arcpy.management.CopyFeatures(inFeats, outFeats)
-
-
-    flds = ['areasymbol', 'musym', 'muname', propVal]
-    arcpy.management.JoinField(outFeats, "mukey", path + os.sep + name + tblExt, "mukey", flds)
-
+                    with arcpy.da.UpdateCursor(dest, ["mukey", fld.name]) as rows:
+                        for row in rows:
+                            val = tblDict.get(row[0])
+                            row[1] = val
+                            rows.updateRow(row)
+    except:
+        errorMsg()
 
 def sym(inLyr):
 
-    if geoExt == '.shp':
-        lyrLoc = outLoc
-    else:
-        lyrLoc = os.path.dirname(outLoc)
+    try:
+
+        #layer file we will be creating
+        outLyr = lyrLoc + os.sep + "SSURGO_express_properties_" + tblName[19:] + ".lyr"
+
+        #original polygons
+        lyr = arcpy.mapping.Layer(inLyr)
+
+        #join each table we collected info on
+        arcpy.management.AddJoin(lyr, "mukey", outLoc+ os.sep + tblName, "mukey", None)
+
+        #source/template symbology
+        srcSymLyr = arcpy.mapping.Layer(os.path.dirname(sys.argv[0]) + os.sep + 'unq_val.lyr')
 
 
-    outLyr = lyrLoc + os.sep + "SSURGO_express_properties_" + name[19:] + ".lyr"
+        #add the layer to arcmap
+        mxd = arcpy.mapping.MapDocument("CURRENT")
+        df = mxd.activeDataFrame
+        arcpy.mapping.AddLayer(df, lyr)
+        #lyr = arcpy.mapping.Layer(outFeats)
 
-    lyr = arcpy.mapping.Layer(inLyr)
+        #search string of the property that was run
+        srcStr =  os.path.basename(lyr.name)
 
-    arcpy.management.AddJoin(lyr, "mukey", path + os.sep + name + tblExt, "mukey", None)
+        #need to strip .shp to find layer in TOC if necessary
+        if srcStr.endswith('.lyr'):
+            srcStr = srcStr[:-4]
 
-    srcSymLyr = arcpy.mapping.Layer(os.path.dirname(sys.argv[0]) + os.sep + 'unq_val.lyr')
+        #set the symbology...
 
+        # must have arcpy list layers (i.e. layer object)
+        # a simple declaration to the layer didn't work
+        # lyr = arcpy.mapping.Layer(outFeats)
+        # refreshing Arc didn't work
+        lyrs = arcpy.mapping.ListLayers(mxd, "*", df)
+        for l in lyrs:
+            if l.name == srcStr:
 
-    #add the layer to arcmap
-    mxd = arcpy.mapping.MapDocument("CURRENT")
-    df = mxd.activeDataFrame
-    arcpy.mapping.AddLayer(df, lyr)
-    #lyr = arcpy.mapping.Layer(outFeats)
+                l.name = tblName[19:]
 
+                valFld = tblName + '.' + propVal
+                if valFld in [x.name for x in arcpy.Describe(l).fields]:
 
+                    arcpy.mapping.UpdateLayer(df, l, srcSymLyr, True)
 
-    #search string of the property that was run
-    srcStr =  os.path.basename(lyr.name)
+                    values = list()
+                    with arcpy.da.SearchCursor(l.name, valFld) as rows:
+                        for row in rows:
+                            for row in rows:
+                                # test to see if rating has a value
+                                if not row[0] == None:
 
-    #need to strip .shp to find layer in TOC if necessary
-    if srcStr.endswith('.lyr'):
-        srcStr = srcStr[:-4]
+                                    aVal = row[0]
 
-    #set the symbology...
+                                    try:
+                                        aVal = round(row[0], 3)
+                                    except:
+                                        aVal = aVal
 
-    # must have arcpy list layers
-    #a simple declaration to the layer didn't work
-    #lyr = arcpy.mapping.Layer(outFeats)
-    #refreshing Arc didn't work
-    lyrs = arcpy.mapping.ListLayers(mxd, "*", df)
-    for l in lyrs:
-        if l.name == srcStr:
+                                    if not aVal in values:
+                                        values.append(aVal)
 
-            l.name = name[19:]
+                    values.sort()
 
-            valFld = name + tblExt + '.'+ propVal
-            if valFld in [x.name for x in arcpy.Describe(l).fields]:
+                    l.symbology.valueField = valFld
+                    l.symbology.addAllValues()
+                    l.symbology.classValues = values
+                    l.symbology.classDescriptions = values
+                    #l.symbology.showOtherValues = False
 
-                arcpy.mapping.UpdateLayer(df, l, srcSymLyr, True)
+                    del values
 
-                values = list()
-                with arcpy.da.SearchCursor(l.name, valFld) as rows:
-                    for row in rows:
-                        #arcpy.AddMessage(row[0])
+                    l.saveACopy(outLyr)
 
-                        #if it's a number
-                        if not propVal in strFldLst:
-                            try:
-                                aVal = round(row[0], 3)
-                            except:
-                                aVal = -1
-
-                        #if it's a string
-                        else:
-                            if row[0] is None:
-                                aVal = 'Not Rated'
-                            else:
-                                aVal = row[0]
-
-                        #arcpy.AddMessage('aVal is: ' + str(aVal))
-                        if not aVal in values:
-                            values.append(aVal)
-                values.sort()
-
-                l.symbology.valueField = valFld
-                l.symbology.addAllValues()
-                l.symbology.classValues = values
-                l.symbology.classDescriptions = values
-                #l.symbology.showOtherValues = False
-
-
-                arcpy.RefreshActiveView()
-                arcpy.RefreshTOC()
-
-                del values
-
-                l.saveACopy(outLyr)
-
-
+    except:
+        errorMsg()
 
 #===============================================================================
 
@@ -734,150 +574,156 @@ arcpy.env.overwriteOutput = True
 arcpy.AddMessage('\n\n')
 
 featSet = arcpy.GetParameterAsText(0)
-arcpy.AddMessage(featSet + '\n\n')
+#arcpy.AddMessage(featSet + '\n\n')
+
+try:
+    aggMethod = arcpy.GetParameterAsText(1)
+    #paramProps = arcpy.GetParameterAsText(2)
+    tDep = arcpy.GetParameterAsText(3)
+    bDep = arcpy.GetParameterAsText(4)
+    mmC = arcpy.GetParameterAsText(5)
+    outLoc = arcpy.GetParameterAsText(6)
+    bAll = arcpy.GetParameterAsText(7)
+    bSingle = arcpy.GetParameterAsText(8)
+
+    propParam = '"' + arcpy.GetParameterAsText(2) + '"'
+    propParam = propParam.replace("'", "")
+    propParam = propParam[1:-1]
+    propLst = propParam.split(";")
+    propLst.sort()
+
+    #layer (.lyr) files created here
+    lyrLoc = os.path.dirname(outLoc)
+
+    if aggMethod == 'Dominant Component (Category)':
+        aggMod = '_dom_comp_cat'
+    elif aggMethod == 'Dominant Component (Numeric)':
+        aggMod = '_dom_comp_num'
+    elif aggMethod == 'Dominant Condition':
+        aggMod ='_dom_cond'
+    elif aggMethod == 'Weighted Average':
+        aggMod = '_wtd_avg'
+    elif aggMethod == 'Min\Max':
+        aggMod = '_min_max'
 
 
-aggMethod = arcpy.GetParameterAsText(1)
-#paramProps = arcpy.GetParameterAsText(2)
-tDep = arcpy.GetParameterAsText(3)
-bDep = arcpy.GetParameterAsText(4)
-mmC = arcpy.GetParameterAsText(5)
-outLoc = arcpy.GetParameterAsText(6)
-bAll = arcpy.GetParameterAsText(7)
-bSingle = arcpy.GetParameterAsText(8)
-
-propParam = '"' + arcpy.GetParameterAsText(2) + '"'
-propParam = propParam.replace("'", "")
-propParam = propParam[1:-1]
-propLst = propParam.split(";")
-
-#these properties return text
-strFldLst = ['weg', 'taxclname', 'taxorder', 'taxsuborder', 'taxtempregime', 'corsteel', 'drainagecl', 'hydgrp', 'corcon']
-
-if aggMethod == 'Dominant Component (Category)':
-    aggMod = '_dom_comp_cat'
-elif aggMethod == 'Dominant Component (Numeric)':
-    aggMod = '_dom_comp_num'
-elif aggMethod == 'Dominant Condition':
-    aggMod ='_dom_cond'
-elif aggMethod == 'Weighted Average':
-    aggMod = '_wtd_avg'
-elif aggMethod == 'Min\Max':
-    aggMod = '_min_max'
-else:
-    raise ForceExit('unable to determine aggregation method')
 
 
-desc = arcpy.Describe(featSet).spatialReference.datumName
-#arcpy.AddMessage(desc)
-
-descWsType = arcpy.Describe(outLoc).workspaceFactoryProgID
-
-if descWsType == '':
-    geoExt = '.shp'
-    tblExt = '.dbf'
-else:
-    geoExt = ''
-    tblExt = ''
+    # get the corrdinates from the parameter and make them into a poly
+    # first point is also the last
+    coorStr = ''
+    with arcpy.da.SearchCursor(featSet, "SHAPE@XY") as rows:
+        for row in rows:
+            coorStr = coorStr + (str(row[0][0]) + " " + str(row[0][1]) + ",")
 
 
-# get the corrdinates from the parameter and make them into a poly
-# first point is also the last
-coorStr = ''
-with arcpy.da.SearchCursor(featSet, "SHAPE@XY") as rows:
-    for row in rows:
-        coorStr = coorStr + (str(row[0][0]) + " " + str(row[0][1]) + ",")
+    cIdx = coorStr.find(",")
+    endPoint = coorStr[:cIdx]
+    coorStr = coorStr + endPoint
+
+    if coorStr == '':
+        raise ForceExit('Fatal. No AOI created')
+
+    arcpy.SetProgressor("step", "Collecting AOI info", 0, len(propLst) + 1, 1)
+
+    geoResponse, geoVal = geoRequest(coorStr)
+
+    if geoResponse:
+        arcpy.SetProgressorPosition()
+        keys = ",".join(geoVal)
+
+        #create a list to collect the names of all the tables created
+        #this will be used in the single table option
+        tbls = list()
+
+        for prop in propLst:
+
+            arcpy.SetProgressorLabel('Collecting ' + prop + '...')
+            propVal = rslvProps(prop).strip()
+
+            root = "SSURGO_express_tbl_"
+
+            if aggMethod == "Weighted Average":
+                tblName =  root + propVal + aggMod + "_" + tDep + "_" + bDep
+                mtName =  aggMod + "_" + tDep + "_" + bDep
+
+            elif aggMethod == "Dominant Component (Category)":
+                tblName =  root + propVal + "_" + aggMod
+                mtName = aggMod
+
+            elif aggMethod == "Min\Max":
+                tblName =  root + propVal + "_" + aggMod + "_" + mmC.upper()
+                mtName = aggMod + "_" + mmC.upper()
+
+            elif aggMethod == "Dominant Component (Numeric)":
+                tblName =  root + propVal + "_" + aggMod + "_" + tDep + "_" + bDep
+                mtName = aggMod + "_" + tDep + "_" + bDep
+
+            elif aggMethod == "Dominant Condition":
+                tblName =  root + propVal + "_" + aggMod
+                mtName = aggMod
+
+            tblName = arcpy.ValidateTableName (tblName)
+            tblName = tblName.replace("___", "_")
+            tblName = tblName.replace("__", "_")
+
+            propLogic, propData, propMsg = tabRequest(propVal)
+
+            if propLogic:
+
+                tbls.append(outLoc + os.sep + tblName)
+
+                PrintMsg(propMsg, 0)
+
+                propRes = propData["Table"]
+
+                if not arcpy.Exists(outLoc + os.sep + tblName):
+
+                    columnNames = propRes.pop(0)
+                    columnInfo = propRes.pop(0)
+
+                    newTable = CreateNewTable(tblName, columnNames, columnInfo)
+
+                    with arcpy.da.InsertCursor(newTable, columnNames) as cursor:
+                        for row in propRes:
+                            cursor.insertRow(row)
+
+                    # convert from in-memory to table on disk
+                    arcpy.conversion.TableToTable(newTable, outLoc, tblName)
 
 
-cIdx = coorStr.find(",")
-endPoint = coorStr[:cIdx]
-coorStr = coorStr + endPoint
+                else:
+                    columnNames = propRes.pop(0)
+                    columnInfo = propRes.pop(0)
 
-if coorStr == '':
-    raise ForceExit('Fatal. No AOI created')
+                    with arcpy.da.InsertCursor(outLoc + os.sep + tblName, columnNames) as cursor:
+                        for row in propRes:
+                            cursor.insertRow(row)
 
-arcpy.SetProgressor("step", "Collecting AOI info", 0, len(propLst) + 1, 1)
+                outFeats = outLoc + os.sep + "SSURGO_express_properties"
 
-geoResponse, geoVal = geoRequest(coorStr)
-
-if geoResponse:
-    arcpy.SetProgressorPosition()
-    keys = ",".join(geoVal)
-
-    for prop in propLst:
-        arcpy.SetProgressorLabel('Collecting ' + prop + '...')
-        #arcpy.AddMessage(prop)
-        propVal = rslvProps(prop).strip()
-
-        root = "SSURGO_express_tbl_"
-
-        if bSingle == 'true':
-            propHldr = 'multiprops'
-        else:
-            propHldr = propVal
-
-        if aggMethod == "Weighted Average":
-            tblName =  root + propHldr + aggMod + "_" + tDep + "_" + bDep
-        elif aggMethod == "Dominant Component (Category)":
-            tblName =  root + propHldr + "_" + aggMod
-        elif aggMethod == "Min\Max":
-            tblName =  root + propHldr + "_" + aggMod + "_" + mmC.upper()
-        elif aggMethod == "Dominant Component (Numeric)":
-            tblName =  root + propHldr + "_" + aggMod + "_" + tDep + "_" + bDep
-        elif aggMethod == "Dominant Condition":
-            tblName =  root + propHldr + "_" + aggMod
-
-        #tblName = "SSURGO_express_tbl" + propVal + aggMethod + tDep + "_" + bDep
-        tblName = arcpy.ValidateTableName (tblName)
-        tblName = tblName.replace("___", "_")
-        tblName = tblName.replace("__", "_")
-        tblName = outLoc + os.sep + tblName
-
-        path = os.path.dirname(tblName)
-        name = os.path.basename(tblName)
-
-        sdaResponse, sdaItem = tabRequest(propVal)
-
-        if sdaResponse:
-
-            outFeats = os.path.join(outLoc, "SSURGO_express_properties" + geoExt)
-
-            if bSingle == 'false' or bSingle == '#':
-                mkTbl(sdaItem)
-                sym(outFeats)
-
-            elif bAll == "true":
-                mkTbl(sdaItem)
-                #mkGeo()
-                sym(outFeats)
-
-            elif bSingle == 'true':
-                soloTbl(sdaItem)
+                if bAll == 'true':
+                    sym(outFeats)
 
             else:
-                mkTbl(sdaItem)
-                sym(outFeats)
-
+                PrintMsg(propMsg, 0)
 
             arcpy.SetProgressorPosition()
 
+        if bSingle == 'true':
 
-        else:
-            arcpy.AddMessage(sdaItem)
+            soloTbl(tbls)
 
+        arcpy.RefreshActiveView()
+        arcpy.RefreshTOC()
 
-    if bSingle == "true":
-        descFlds = [(x.name).encode() for x in arcpy.Describe(path + os.sep + name + tblExt).fields]
-        descFlds.remove("MUKEY")
-        arcpy.management.JoinField(outLoc + os.sep + "SSURGO_express_properties" + geoExt, "mukey", path + os.sep + name + tblExt, "mukey", descFlds)
-        outFeats = os.path.join(outLoc, "SSURGO_express_properties" + geoExt)
-        #arcpy.AddMessage(outFeats)
-        sym(outFeats)
+    else:
+        arcpy.AddError('Fatal.\n' + geoVal)
 
-else:
-    arcpy.AddError('Fatal.\n' + geoVal)
+    arcpy.AddMessage('\n\n')
 
-arcpy.AddMessage('\n\n')
+except:
+    errorMsg()
 
 
 
