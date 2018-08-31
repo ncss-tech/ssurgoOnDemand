@@ -129,7 +129,7 @@ def getMuaggatt(aSym):
         FROM legend
         INNER JOIN mapunit ON mapunit.lkey=legend.lkey
         INNER JOIN muaggatt ma ON mapunit.mukey=ma.mukey
-        WHERE areasymbol = '""" + aSym + """'"""
+        WHERE areasymbol IN (""" + aSym + """)"""
 
         #theURL = "https://sdmdataaccess.nrcs.usda.gov"
         #url = theURL + "/Tabular/SDMTabularService/post.rest"
@@ -152,15 +152,12 @@ def getMuaggatt(aSym):
         code = response.getcode()
         cResponse = bhrh.responses.get(code)
         cResponse = "{}; {}".format(cResponse[0], cResponse[1])
-        print cResponse
 
         # read query results
         qResults = response.read()
 
         # Convert the returned JSON string into a Python dictionary.
         qData = json.loads(qResults)
-
-        print qData
 
         # get rid of objects
         del qResults, response, req
@@ -171,7 +168,7 @@ def getMuaggatt(aSym):
             return True, qData, cResponse
 
         else:
-            cResponse = "muaggat failed for " + aSym
+            cResponse = "muaggat failed for " + state
             return False, None, cResponse
 
     except socket.timeout as e:
@@ -179,15 +176,15 @@ def getMuaggatt(aSym):
         return False, None, Msg
 
     except socket.error as e:
-        Msg = 'Socket error: ' + str(e)
+        state + " = " + str(e)
         return False, None, Msg
 
     except HTTPError as e:
-        Msg = 'HTTP Error' + str(e)
+        Msg = state +  " = " + str(e)
         return False, None, Msg
 
     except URLError as e:
-        Msg = 'URL Error' + str(e)
+        state + " = " + str(e)
         return False, None, Msg
 
     except:
@@ -216,30 +213,35 @@ tblName = 'SOD_muaggat'
 
 try:
     areaList = areaParam.split(";")
+    states = list(set([s[:2] for s in areaList]))
+    states.sort()
 
     failMuaggatt = list()
 
-    jobCnt = len(areaList)
+    jobCnt = len(states)
 
     n=0
     arcpy.SetProgressor('step', 'Starting MUAGGATT Tool...', 0, jobCnt, 1)
 
-    #compDict = dict()
+    # for eSSA in areaList:
+    for state in states:
+        p = [x for x in areaList if x[:2] == state]
+        theReq = ",".join(map("'{0}'".format, p))
 
-    for eSSA in areaList:
-        n = n + 1
-        arcpy.SetProgressorLabel('Collecting muaggatt table for: ' + eSSA + " (" + str(n) + ' of ' + str(jobCnt) + ')')
+        n += 1
 
-        agLogic, agData, agMsg = getMuaggatt(eSSA)
+        arcpy.SetProgressorLabel('Collecting muaggatt table for: ' + state + " (" + str(n) + ' of ' + str(jobCnt) + ')')
+
+        agLogic, agData, agMsg = getMuaggatt(theReq)
 
         #if it was successful...
         if agLogic:
             if len(agData) == 0:
-                PrintMsg('No records returned for ' + eSSA, 1)
-                failMuaggatt.append(eSSA )
+                PrintMsg('No records returned for ' + state, 1)
+                failMuaggatt.append(state)
                 
             else:
-                PrintMsg('Response for muaggatt request on ' + eSSA + ' = ' + agMsg)
+                PrintMsg('Response for muaggatt request on ' + state + ' = ' + agMsg)
                 agRes = agData["Table"]
 
             if not arcpy.Exists(WS + os.sep + tblName):
@@ -265,21 +267,19 @@ try:
                     for row in agRes:
                         cursor.insertRow(row)
 
-               
-
         #if it was unsuccessful...
         else:
             #try again
-            agLogic, agData, agMsg = getMuaggatt(eSSA)
+            agLogic, agData, agMsg = getMuaggatt(theReq)
 
             #if 2nd run was successful
             if agLogic:
                 if len(agData) == 0:
                     PrintMsg('No records returned for ' + eSSA , 1)
-                    failMuaggatt.append(eSSA )
+                    failMuaggatt.append(state)
 
                 else:
-                    PrintMsg('Response for muaggatt table request on'  + eSSA + ' = ' + agMsg + ' - 2nd attempt')
+                    PrintMsg('Response for muaggatt table request on'  + state + ' = ' + agMsg + ' - 2nd attempt')
                     agRes = agData["Table"]
 
                 if not arcpy.Exists(WS + os.sep + tblName):
@@ -308,7 +308,7 @@ try:
             #if 2nd run was unsuccesful that's' it
             else:
                 PrintMsg(agMsg)
-                failMuaggatt.append(eSSA)
+                failMuaggatt.append(state)
 
         arcpy.SetProgressorPosition()
 

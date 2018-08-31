@@ -300,7 +300,6 @@ def tabRequest(interp):
             Msg = 'Unable to collect interpretation informations for ' + interp
             return False, Msg
 
-
     except socket.timeout as e:
         Msg = 'Soil Data Access timeout error'
         return False, Msg

@@ -247,7 +247,7 @@ def getPMgrp(areaSym, dBool):
 
 
              FROM sacatalog
-             INNER JOIN legend  ON legend.areasymbol = sacatalog.areasymbol AND sacatalog.areasymbol = '""" + areaSym + """'
+             INNER JOIN legend  ON legend.areasymbol = sacatalog.areasymbol AND sacatalog.areasymbol IN (""" + areaSym + """)
              INNER JOIN mapunit  ON mapunit.lkey = legend.lkey
              INNER JOIN component AS c ON c.mukey = mapunit.mukey AND c.cokey =
              (SELECT TOP 1 c1.cokey FROM component AS c1
@@ -266,7 +266,7 @@ def getPMgrp(areaSym, dBool):
              pmgroupname
 
              FROM sacatalog
-             INNER JOIN legend  ON legend.areasymbol = sacatalog.areasymbol AND sacatalog.areasymbol = '""" + areaSym + """'
+             INNER JOIN legend  ON legend.areasymbol = sacatalog.areasymbol AND sacatalog.areasymbol IN (""" + areaSym + """)
              INNER JOIN mapunit  ON mapunit.lkey = legend.lkey
              INNER JOIN component AS c ON c.mukey = mapunit.mukey AND c.cokey =
              (SELECT TOP 1 c1.cokey FROM component AS c1
@@ -284,7 +284,7 @@ def getPMgrp(areaSym, dBool):
         request["format"] = "JSON+COLUMNNAME+METADATA"
         request["query"] = pmQry
 
-        #json.dumps = serialize obj (request dictionary) to a JSON formatted str
+        # json.dumps = serialize obj (request dictionary) to a JSON formatted str
         data = json.dumps(request)
 
         # Send request to SDA Tabular service using urllib2 library
@@ -292,7 +292,7 @@ def getPMgrp(areaSym, dBool):
         req = urllib2.Request(url, data)
         response = urllib2.urlopen(req)
 
-        #get http response code and decode
+        # get http response code and decode
         code = response.getcode()
         cResponse = bhrh.responses.get(code)
         cResponse = "{}; {}".format(cResponse[0], cResponse[1])
@@ -315,21 +315,20 @@ def getPMgrp(areaSym, dBool):
             cResponse = 'Failed'
             return False, None, cResponse
 
-
     except socket.timeout as e:
         Msg = 'Soil Data Access timeout error'
         return False, None, Msg
 
     except socket.error as e:
-        Msg = 'Socket error: ' + str(e)
+        Msg = str(e)
         return False, None, Msg
 
     except HTTPError as e:
-        Msg = 'HTTP Error: ' + str(e)
+        Msg = str(e)
         return False, None, Msg
 
     except URLError as e:
-        Msg = 'URL Error: ' + str(e)
+        Msg = str(e)
         return False, None, Msg
 
     except:
@@ -343,7 +342,6 @@ import arcpy, sys, os, traceback, time, httplib, urllib2, json
 #import xml.etree.cElementTree as ET
 
 arcpy.env.overwriteOutput = True
-
 
 AddMsgAndPrint('\n \n')
 
@@ -359,32 +357,39 @@ tblName = "SOD_pmgrpname"
 
 try:
     areaList = areaParam.split(";")
+    states = list(set([s[:2] for s in areaList]))
+    states.sort()
 
     failPM = list()
 
-    jobCnt = len(areaList)
+    jobCnt = len(states)
 
     n=0
     arcpy.SetProgressor('step', 'Starting Parent Material Group Name Tool...', 0, jobCnt, 1)
 
     compDict = dict()
 
-    for eSSA in areaList:
+    # for eSSA in areaList:
+    for state in states:
+        p = [x for x in areaList if x[:2] == state]
+        theReq = ",".join(map("'{0}'".format, p))
+
         n = n + 1
-        arcpy.SetProgressorLabel('Collecting parent material table for: ' + eSSA + " (" + str(n) + ' of ' + str(jobCnt) + ')')
+
+        arcpy.SetProgressorLabel('Collecting parent material table for: ' + state + " (" + str(n) + ' of ' + str(jobCnt) + ')')
 
         #send the request
         #True, funcDict, cResponse
-        pmLogic, pmData, pmMsg = getPMgrp(eSSA, dBool)
+        pmLogic, pmData, pmMsg = getPMgrp(theReq, dBool)
 
         #if it was successful...
         if pmLogic:
             if len(pmData) == 0:
-                AddMsgAndPrint('No records returned for ' + eSSA, 1)
+                AddMsgAndPrint('No records returned for ' + state, 1)
                 failPM.append(eSSA )
                 arcpy.SetProgressorPosition()
             else:
-                AddMsgAndPrint('Response for parent material table request on ' + eSSA + ' = ' + pmMsg)
+                AddMsgAndPrint('Response for parent material table request on ' + state + ' = ' + pmMsg)
                 pmRes = pmData["Table"]
 
                 if not arcpy.Exists(WS + os.sep + tblName):
@@ -416,16 +421,16 @@ try:
         #if it was unsuccessful...
         else:
             #try again
-            pmLogic, pmData, pmMsg = getPMgrp(eSSA, ordLst, dBool)
+            pmLogic, pmData, pmMsg = getPMgrp(theReq, dBool)
 
             #if 2nd run was successful
             if pmLogic:
                 if len(pmData) == 0:
-                    AddMsgAndPrint('No records returned for ' + eSSA , 1)
+                    AddMsgAndPrint('No records returned for ' + state , 1)
                     failPM.append(eSSA )
                     arcpy.SetProgressorPosition()
                 else:
-                    AddMsgAndPrint('Response for parent material table request on '  + eSSA + ' = ' + pmMsg + ' - 2nd attempt')
+                    AddMsgAndPrint('Response for parent material table request on '  + state + ' = ' + pmMsg + ' - 2nd attempt')
                     pmRes = pmData["Table"]
 
                     if not arcpy.Exists(WS + os.sep + tblName):
@@ -456,8 +461,8 @@ try:
 
             #if 2nd run was unsuccesful that's' it
             else:
-                AddMsgAndPrint('Response for parent material table request on '  + eSSA + ' = ' + pmMsg + ' - 2nd attempt')
-                failPM.append(eSSA)
+                AddMsgAndPrint('Response for parent material table request on '  + state + ' = ' + pmMsg + ' - 2nd attempt')
+                failPM.append(state)
                 arcpy.SetProgressorPosition()
 
     arcpy.AddMessage('\n')

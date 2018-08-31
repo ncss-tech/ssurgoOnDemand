@@ -66,7 +66,7 @@ def rslvProps(aProp):
     except:
         errorMsg()
 
-def getProps(aProp, areaSym, aggMethod, tDep, bDep, mmC):
+def getProps(aProp, areaReq, aggMethod, tDep, bDep, mmC):
 
     import socket
     from urllib2 import URLError, HTTPError
@@ -74,163 +74,161 @@ def getProps(aProp, areaSym, aggMethod, tDep, bDep, mmC):
     try:
 
         if aggMethod == "Dominant Component (Category)":
-            propQry = "SELECT areasymbol, musym, muname, mu.mukey  AS mukey, " + aProp + " AS " + aProp + "\n"\
-            " FROM legend  AS l\n"\
-            " INNER JOIN  mapunit AS mu ON mu.lkey = l.lkey\n\n"\
-            " AND l.areasymbol LIKE '" + areaSym +"'\n"\
-            " INNER JOIN component AS c ON c.mukey = mu.mukey\n\n"\
-            " AND c.cokey =\n"\
-            " (SELECT TOP 1 c1.cokey FROM component AS c1\n"\
-            " INNER JOIN mapunit ON c.mukey=mapunit.mukey AND c1.mukey=mu.mukey ORDER BY c1.comppct_r DESC, c1.cokey)"
+            propQry = """SELECT areasymbol, musym, muname, mu.mukey  AS mukey, """ + aProp + """ AS """ + aProp + """
+            FROM legend  AS l
+            INNER JOIN  mapunit AS mu ON mu.lkey = l.lkey
+            AND l.areasymbol IN (""" + areaReq + """)
+            INNER JOIN component AS c ON c.mukey = mu.mukey
+            AND c.cokey =
+            (SELECT TOP 1 c1.cokey FROM component AS c1
+            INNER JOIN mapunit ON c.mukey=mapunit.mukey AND c1.mukey=mu.mukey ORDER BY c1.comppct_r DESC, c1.cokey)"""
         elif aggMethod == "Weighted Average":
-            propQry = "SELECT areasymbol, musym, muname, mukey\n"\
-            " INTO #kitchensink\n"\
-            " FROM legend  AS lks\n"\
-            " INNER JOIN  mapunit AS muks ON muks.lkey = lks.lkey AND lks.areasymbol ='" + areaSym + "'\n"\
-            " SELECT mu1.mukey, cokey, comppct_r,"\
-            " SUM (comppct_r) over(partition by mu1.mukey ) AS SUM_COMP_PCT\n"\
-            " INTO #comp_temp\n"\
-            " FROM legend  AS l1\n"\
-            " INNER JOIN  mapunit AS mu1 ON mu1.lkey = l1.lkey AND l1.areasymbol = '" + areaSym + "'\n"\
-            " INNER JOIN  component AS c1 ON c1.mukey = mu1.mukey AND majcompflag = 'Yes'\n"\
-            " SELECT cokey, SUM_COMP_PCT, CASE WHEN comppct_r = SUM_COMP_PCT THEN 1\n"\
-            " ELSE CAST (CAST (comppct_r AS  decimal (5,2)) / CAST (SUM_COMP_PCT AS decimal (5,2)) AS decimal (5,2)) END AS WEIGHTED_COMP_PCT\n"\
-            " INTO #comp_temp3\n"\
-            " FROM #comp_temp\n"\
-            " SELECT\n"\
-            " areasymbol, musym, muname, mu.mukey/1  AS MUKEY, c.cokey AS COKEY, ch.chkey/1 AS CHKEY, compname, hzname, hzdept_r, hzdepb_r, CASE WHEN hzdept_r <" + tDep + "  THEN " + tDep + " ELSE hzdept_r END AS hzdept_r_ADJ,\n"\
-            " CASE WHEN hzdepb_r > " + bDep + "  THEN " + bDep + " ELSE hzdepb_r END AS hzdepb_r_ADJ,\n"\
-            " CAST (CASE WHEN hzdepb_r > " +bDep + "  THEN " +bDep + " ELSE hzdepb_r END - CASE WHEN hzdept_r <" + tDep + " THEN " + tDep + " ELSE hzdept_r END AS decimal (5,2)) AS thickness,\n"\
-            " comppct_r,\n"\
-            " CAST (SUM (CASE WHEN hzdepb_r > " + bDep + "  THEN " + bDep + " ELSE hzdepb_r END - CASE WHEN hzdept_r <" + tDep + " THEN " + tDep + " ELSE hzdept_r END) over(partition by c.cokey) AS decimal (5,2)) AS sum_thickness,\n"\
-            " CAST (ISNULL (" + aProp + ", 0) AS decimal (5,2))AS " + aProp +\
-            " INTO #main"\
-            " FROM legend  AS l\n"\
-            " INNER JOIN  mapunit AS mu ON mu.lkey = l.lkey AND l.areasymbol LIKE '" + areaSym + "'\n"\
-            " INNER JOIN  component AS c ON c.mukey = mu.mukey\n"\
-            " INNER JOIN chorizon AS ch ON ch.cokey=c.cokey AND hzname NOT LIKE '%O%'AND hzname NOT LIKE '%r%'\n"\
-            " AND hzdepb_r >" + tDep + " AND hzdept_r <" + bDep + ""\
-            " INNER JOIN chtexturegrp AS cht ON ch.chkey=cht.chkey  WHERE cht.rvindicator = 'yes' AND  ch.hzdept_r IS NOT NULL\n"\
-            " AND texture NOT LIKE '%PM%' and texture NOT LIKE '%DOM' and texture NOT LIKE '%MPT%' and texture NOT LIKE '%MUCK' and texture NOT LIKE '%PEAT%' and texture NOT LIKE '%br%' and texture NOT LIKE '%wb%'\n"\
-            " ORDER BY areasymbol, musym, muname, mu.mukey, comppct_r DESC, cokey,  hzdept_r, hzdepb_r\n"\
-            " SELECT #main.areasymbol, #main.musym, #main.muname, #main.MUKEY,\n"\
-            " #main.COKEY, #main.CHKEY, #main.compname, hzname, hzdept_r, hzdepb_r, hzdept_r_ADJ, hzdepb_r_ADJ, thickness, sum_thickness, " + aProp + ", comppct_r, SUM_COMP_PCT, WEIGHTED_COMP_PCT ,\n"\
-            " SUM((thickness/sum_thickness ) * " + aProp + " )over(partition by #main.COKEY)AS COMP_WEIGHTED_AVERAGE\n"\
-            " INTO #comp_temp2\n"\
-            " FROM #main\n"\
-            " INNER JOIN #comp_temp3 ON #comp_temp3.cokey=#main.cokey\n"\
-            " ORDER BY #main.areasymbol, #main.musym, #main.muname, #main.MUKEY, comppct_r DESC,  #main.COKEY,  hzdept_r, hzdepb_r\n"\
-            " SELECT #comp_temp2.MUKEY,#comp_temp2.COKEY, WEIGHTED_COMP_PCT * COMP_WEIGHTED_AVERAGE AS COMP_WEIGHTED_AVERAGE1\n"\
-            " INTO #last_step\n"\
-            " FROM #comp_temp2\n"\
-            " GROUP BY  #comp_temp2.MUKEY,#comp_temp2.COKEY, WEIGHTED_COMP_PCT, COMP_WEIGHTED_AVERAGE\n"\
-            " SELECT areasymbol, musym, muname,\n"\
-            " #kitchensink.mukey, #last_step.COKEY,\n"\
-            " CAST (SUM (COMP_WEIGHTED_AVERAGE1) over(partition by #kitchensink.mukey) as decimal(5,2))AS " + aProp + "\n"\
-            " INTO #last_step2"\
-            " FROM #last_step\n"\
-            " RIGHT OUTER JOIN #kitchensink ON #kitchensink.mukey=#last_step.mukey\n"\
-            " GROUP BY #kitchensink.areasymbol, #kitchensink.musym, #kitchensink.muname, #kitchensink.mukey, COMP_WEIGHTED_AVERAGE1, #last_step.COKEY\n"\
-            " ORDER BY #kitchensink.areasymbol, #kitchensink.musym, #kitchensink.muname, #kitchensink.mukey\n"\
-            " SELECT #last_step2.areasymbol, #last_step2.musym, #last_step2.muname,\n"\
-            " #last_step2.mukey, #last_step2." + aProp + "\n"\
-            " FROM #last_step2\n"\
-            " LEFT OUTER JOIN #last_step ON #last_step.mukey=#last_step2.mukey\n"\
-            " GROUP BY #last_step2.areasymbol, #last_step2.musym, #last_step2.muname, #last_step2.mukey, #last_step2." + aProp + "\n"\
-            " ORDER BY #last_step2.areasymbol, #last_step2.musym, #last_step2.muname, #last_step2.mukey, #last_step2."+ aProp
+            propQry = """SELECT areasymbol, musym, muname, mukey
+            INTO #kitchensink
+            FROM legend  AS lks
+            INNER JOIN  mapunit AS muks ON muks.lkey = lks.lkey AND lks.areasymbol IN(""" + areaReq + """)
+            SELECT mu1.mukey, cokey, comppct_r,
+            SUM (comppct_r) over(partition by mu1.mukey ) AS SUM_COMP_PCT
+            INTO #comp_temp
+            FROM legend  AS l1
+            INNER JOIN  mapunit AS mu1 ON mu1.lkey = l1.lkey AND l1.areasymbol IN (""" + areaReq + """)
+            INNER JOIN  component AS c1 ON c1.mukey = mu1.mukey AND majcompflag = 'Yes'
+            SELECT cokey, SUM_COMP_PCT, CASE WHEN comppct_r = SUM_COMP_PCT THEN 1
+            ELSE CAST (CAST (comppct_r AS  decimal (5,2)) / CAST (SUM_COMP_PCT AS decimal (5,2)) AS decimal (5,2)) END AS WEIGHTED_COMP_PCT
+            INTO #comp_temp3
+            FROM #comp_temp
+            SELECT
+            areasymbol, musym, muname, mu.mukey/1  AS MUKEY, c.cokey AS COKEY, ch.chkey/1 AS CHKEY, compname, hzname, hzdept_r, hzdepb_r, CASE WHEN hzdept_r <""" + tDep + """  THEN """ + tDep + """ ELSE hzdept_r END AS hzdept_r_ADJ,
+            CASE WHEN hzdepb_r > """ + bDep + """  THEN """ + bDep + """ ELSE hzdepb_r END AS hzdepb_r_ADJ,
+            CAST (CASE WHEN hzdepb_r > """ +bDep + """  THEN """ +bDep + """ ELSE hzdepb_r END - CASE WHEN hzdept_r <""" + tDep + """ THEN """ + tDep + """ ELSE hzdept_r END AS decimal (5,2)) AS thickness,
+            comppct_r,
+            CAST (SUM (CASE WHEN hzdepb_r > """ + bDep + """  THEN """ + bDep + """ ELSE hzdepb_r END - CASE WHEN hzdept_r <""" + tDep + """ THEN """ + tDep + """ ELSE hzdept_r END) over(partition by c.cokey) AS decimal (5,2)) AS sum_thickness,
+            CAST (ISNULL (""" + aProp + """, 0) AS decimal (5,2))AS """ + aProp + """
+            INTO #main
+            FROM legend  AS l
+            INNER JOIN  mapunit AS mu ON mu.lkey = l.lkey AND l.areasymbol IN (""" + areaReq + """)
+            INNER JOIN  component AS c ON c.mukey = mu.mukey
+            INNER JOIN chorizon AS ch ON ch.cokey=c.cokey AND hzname NOT LIKE '%O%'AND hzname NOT LIKE '%r%'
+            AND hzdepb_r >""" + tDep + """ AND hzdept_r <""" + bDep + """
+            INNER JOIN chtexturegrp AS cht ON ch.chkey=cht.chkey  WHERE cht.rvindicator = 'yes' AND  ch.hzdept_r IS NOT NULL
+            AND texture NOT LIKE '%PM%' and texture NOT LIKE '%DOM' and texture NOT LIKE '%MPT%' and texture NOT LIKE '%MUCK' and texture NOT LIKE '%PEAT%' and texture NOT LIKE '%br%' and texture NOT LIKE '%wb%'
+            ORDER BY areasymbol, musym, muname, mu.mukey, comppct_r DESC, cokey,  hzdept_r, hzdepb_r
+            SELECT #main.areasymbol, #main.musym, #main.muname, #main.MUKEY,
+            #main.COKEY, #main.CHKEY, #main.compname, hzname, hzdept_r, hzdepb_r, hzdept_r_ADJ, hzdepb_r_ADJ, thickness, sum_thickness, """ + aProp + """, comppct_r, SUM_COMP_PCT, WEIGHTED_COMP_PCT ,
+            SUM((thickness/sum_thickness ) * """ + aProp + """ )over(partition by #main.COKEY)AS COMP_WEIGHTED_AVERAGE
+            INTO #comp_temp2
+            FROM #main
+            INNER JOIN #comp_temp3 ON #comp_temp3.cokey=#main.cokey
+            ORDER BY #main.areasymbol, #main.musym, #main.muname, #main.MUKEY, comppct_r DESC,  #main.COKEY,  hzdept_r, hzdepb_r
+            SELECT #comp_temp2.MUKEY,#comp_temp2.COKEY, WEIGHTED_COMP_PCT * COMP_WEIGHTED_AVERAGE AS COMP_WEIGHTED_AVERAGE1
+            INTO #last_step
+            FROM #comp_temp2
+            GROUP BY  #comp_temp2.MUKEY,#comp_temp2.COKEY, WEIGHTED_COMP_PCT, COMP_WEIGHTED_AVERAGE
+            SELECT areasymbol, musym, muname,
+            #kitchensink.mukey, #last_step.COKEY,
+            CAST (SUM (COMP_WEIGHTED_AVERAGE1) over(partition by #kitchensink.mukey) as decimal(5,2))AS """ + aProp + """
+            INTO #last_step2
+            FROM #last_step
+            RIGHT OUTER JOIN #kitchensink ON #kitchensink.mukey=#last_step.mukey
+            GROUP BY #kitchensink.areasymbol, #kitchensink.musym, #kitchensink.muname, #kitchensink.mukey, COMP_WEIGHTED_AVERAGE1, #last_step.COKEY
+            ORDER BY #kitchensink.areasymbol, #kitchensink.musym, #kitchensink.muname, #kitchensink.mukey
+            SELECT #last_step2.areasymbol, #last_step2.musym, #last_step2.muname,
+            #last_step2.mukey, #last_step2.""" + aProp + """
+            FROM #last_step2
+            LEFT OUTER JOIN #last_step ON #last_step.mukey=#last_step2.mukey
+            GROUP BY #last_step2.areasymbol, #last_step2.musym, #last_step2.muname, #last_step2.mukey, #last_step2.""" + aProp + """
+            ORDER BY #last_step2.areasymbol, #last_step2.musym, #last_step2.muname, #last_step2.mukey, #last_step2.""" + aProp
         elif aggMethod == "Min\Max":
-            propQry = "SELECT areasymbol, musym, muname, mu.mukey  AS mukey,\n"\
-            " (SELECT TOP 1 " + mmC + " (chm1." + aProp + ") FROM  component AS cm1\n"\
-            " INNER JOIN chorizon AS chm1 ON cm1.cokey = chm1.cokey AND cm1.cokey = c.cokey\n"\
-            " AND CASE WHEN chm1.hzname LIKE  '%O%' AND hzdept_r <10 THEN 2\n"\
-            " WHEN chm1.hzname LIKE  '%r%' THEN 2\n"\
-            " WHEN chm1.hzname LIKE  '%'  THEN  1 ELSE 1 END = 1\n"\
-            " ) AS " + aProp + "\n"+\
-            " FROM legend  AS l\n"\
-            " INNER JOIN  mapunit AS mu ON mu.lkey = l.lkey AND l.areasymbol = '" + areaSym + "'\n"\
-            " INNER JOIN  component AS c ON c.mukey = mu.mukey  AND c.cokey =\n"\
-            " (SELECT TOP 1 c1.cokey FROM component AS c1\n"\
-            " INNER JOIN mapunit ON c.mukey=mapunit.mukey AND c1.mukey=mu.mukey ORDER BY c1.comppct_r DESC, c1.cokey)\n"
+            propQry = """SELECT areasymbol, musym, muname, mu.mukey  AS mukey,
+            (SELECT TOP 1 """ + mmC + """ (chm1.""" + aProp + """) FROM  component AS cm1
+            INNER JOIN chorizon AS chm1 ON cm1.cokey = chm1.cokey AND cm1.cokey = c.cokey
+            AND CASE WHEN chm1.hzname LIKE  '%O%' AND hzdept_r <10 THEN 2
+            WHEN chm1.hzname LIKE  '%r%' THEN 2
+            WHEN chm1.hzname LIKE  '%'  THEN  1 ELSE 1 END = 1
+            ) AS """ + aProp + """
+            FROM legend  AS l
+            INNER JOIN  mapunit AS mu ON mu.lkey = l.lkey AND l.areasymbol IN (""" + areaReq + """)
+            INNER JOIN  component AS c ON c.mukey = mu.mukey  AND c.cokey =
+            (SELECT TOP 1 c1.cokey FROM component AS c1
+            INNER JOIN mapunit ON c.mukey=mapunit.mukey AND c1.mukey=mu.mukey ORDER BY c1.comppct_r DESC, c1.cokey)"""
         elif aggMethod == "Dominant Component (Numeric)":
-            propQry = "SELECT areasymbol, musym, muname, mukey\n"\
-            " INTO #kitchensink\n"\
-            " FROM legend  AS lks\n"\
-            " INNER JOIN  mapunit AS muks ON muks.lkey = lks.lkey AND lks.areasymbol  ='" + areaSym + "'\n"\
-            " SELECT mu1.mukey, cokey, comppct_r,\n"\
-            " SUM (comppct_r) over(partition by mu1.mukey ) AS SUM_COMP_PCT\n"\
-            " INTO #comp_temp\n"\
-            " FROM legend  AS l1\n"\
-            " INNER JOIN  mapunit AS mu1 ON mu1.lkey = l1.lkey AND l1.areasymbol = '" + areaSym + "'\n"\
-            " INNER JOIN  component AS c1 ON c1.mukey = mu1.mukey AND majcompflag = 'Yes'\n"\
-            " AND c1.cokey =\n"\
-            " (SELECT TOP 1 c2.cokey FROM component AS c2\n"\
-            " INNER JOIN mapunit AS mm1 ON c2.mukey=mm1.mukey AND c2.mukey=mu1.mukey ORDER BY c2.comppct_r DESC, c2.cokey)\n"\
-            " SELECT cokey, SUM_COMP_PCT, CASE WHEN comppct_r = SUM_COMP_PCT THEN 1\n"\
-            " ELSE CAST (CAST (comppct_r AS  decimal (5,2)) / CAST (SUM_COMP_PCT AS decimal (5,2)) AS decimal (5,2)) END AS WEIGHTED_COMP_PCT\n"\
-            " INTO #comp_temp3\n"\
-            " FROM #comp_temp\n"\
-            " SELECT areasymbol, musym, muname, mu.mukey/1  AS MUKEY, c.cokey AS COKEY, ch.chkey/1 AS CHKEY, compname, hzname, hzdept_r, hzdepb_r, CASE WHEN hzdept_r < " + tDep + " THEN " + tDep + " ELSE hzdept_r END AS hzdept_r_ADJ,"\
-            " CASE WHEN hzdepb_r > " + bDep + "  THEN " + bDep + " ELSE hzdepb_r END AS hzdepb_r_ADJ,\n"\
-            " CAST (CASE WHEN hzdepb_r > " + bDep + "  THEN " + bDep + " ELSE hzdepb_r END - CASE WHEN hzdept_r <" + tDep + " THEN " + tDep + " ELSE hzdept_r END AS decimal (5,2)) AS thickness,\n"\
-            " comppct_r,\n"\
-            " CAST (SUM (CASE WHEN hzdepb_r > " + bDep + "  THEN " + bDep + " ELSE hzdepb_r END - CASE WHEN hzdept_r <" + tDep + " THEN " + tDep + " ELSE hzdept_r END) over(partition by c.cokey) AS decimal (5,2)) AS sum_thickness,\n"\
-            " CAST (ISNULL (" + aProp + " , 0) AS decimal (5,2))AS " + aProp + " \n"\
-            " INTO #main\n"\
-            " FROM legend  AS l\n"\
-            " INNER JOIN  mapunit AS mu ON mu.lkey = l.lkey AND l.areasymbol LIKE '" + areaSym + "'\n"\
-            " INNER JOIN  component AS c ON c.mukey = mu.mukey\n"\
-            " INNER JOIN chorizon AS ch ON ch.cokey=c.cokey AND hzname NOT LIKE '%O%'AND hzname NOT LIKE '%r%'\n"\
-            " AND hzdepb_r >" + tDep + " AND hzdept_r <" + bDep + "\n"\
-            " INNER JOIN chtexturegrp AS cht ON ch.chkey=cht.chkey  WHERE cht.rvindicator = 'yes' AND  ch.hzdept_r IS NOT NULL\n"\
-            " AND\n"\
-            " texture NOT LIKE '%PM%' and texture NOT LIKE '%DOM' and texture NOT LIKE '%MPT%' and texture NOT LIKE '%MUCK' and texture NOT LIKE '%PEAT%' and texture NOT LIKE '%br%' and texture NOT LIKE '%wb%'\n"\
-            " ORDER BY areasymbol, musym, muname, mu.mukey, comppct_r DESC, cokey,  hzdept_r, hzdepb_r\n"\
-            " SELECT #main.areasymbol, #main.musym, #main.muname, #main.MUKEY,\n"\
-            " #main.COKEY, #main.CHKEY, #main.compname, hzname, hzdept_r, hzdepb_r, hzdept_r_ADJ, hzdepb_r_ADJ, thickness, sum_thickness, " + aProp + " , comppct_r, SUM_COMP_PCT, WEIGHTED_COMP_PCT ,\n"\
-            " SUM((thickness/sum_thickness ) * " + aProp + "  )over(partition by #main.COKEY)AS COMP_WEIGHTED_AVERAGE\n"\
-            " INTO #comp_temp2\n"\
-            " FROM #main\n"\
-            " INNER JOIN #comp_temp3 ON #comp_temp3.cokey=#main.cokey\n"\
-            " ORDER BY #main.areasymbol, #main.musym, #main.muname, #main.MUKEY, comppct_r DESC,  #main.COKEY,  hzdept_r, hzdepb_r\n"\
-            " SELECT #comp_temp2.MUKEY,#comp_temp2.COKEY, WEIGHTED_COMP_PCT * COMP_WEIGHTED_AVERAGE AS COMP_WEIGHTED_AVERAGE1\n"\
-            " INTO #last_step\n"\
-            " FROM #comp_temp2\n"\
-            " GROUP BY  #comp_temp2.MUKEY,#comp_temp2.COKEY, WEIGHTED_COMP_PCT, COMP_WEIGHTED_AVERAGE\n"\
-            " SELECT areasymbol, musym, muname,\n"\
-            " #kitchensink.mukey, #last_step.COKEY,\n"\
-            " CAST (SUM (COMP_WEIGHTED_AVERAGE1) over(partition by #kitchensink.mukey) as decimal(5,2))AS " + aProp + "\n"\
-            " INTO #last_step2\n"\
-            " FROM #last_step\n"\
-            " RIGHT OUTER JOIN #kitchensink ON #kitchensink.mukey=#last_step.mukey\n"\
-            " GROUP BY #kitchensink.areasymbol, #kitchensink.musym, #kitchensink.muname, #kitchensink.mukey, COMP_WEIGHTED_AVERAGE1, #last_step.COKEY\n"\
-            " ORDER BY #kitchensink.areasymbol, #kitchensink.musym, #kitchensink.muname, #kitchensink.mukey\n"\
-            " SELECT #last_step2.areasymbol, #last_step2.musym, #last_step2.muname,\n"\
-            " #last_step2.mukey, #last_step2." + aProp + "\n"\
-            " FROM #last_step2\n"\
-            " LEFT OUTER JOIN #last_step ON #last_step.mukey=#last_step2.mukey\n"\
-            " GROUP BY #last_step2.areasymbol, #last_step2.musym, #last_step2.muname, #last_step2.mukey, #last_step2." + aProp + "\n"\
-            " ORDER BY #last_step2.areasymbol, #last_step2.musym, #last_step2.muname, #last_step2.mukey, #last_step2." + aProp
+            propQry = """SELECT areasymbol, musym, muname, mukey
+            INTO #kitchensink
+            FROM legend  AS lks
+            INNER JOIN  mapunit AS muks ON muks.lkey = lks.lkey AND lks.areasymbol  IN (""" + areaReq + """)
+            SELECT mu1.mukey, cokey, comppct_r,
+            SUM (comppct_r) over(partition by mu1.mukey ) AS SUM_COMP_PCT
+            INTO #comp_temp
+            FROM legend  AS l1
+            INNER JOIN  mapunit AS mu1 ON mu1.lkey = l1.lkey AND l1.areasymbol IN (""" + areaReq + """)
+            INNER JOIN  component AS c1 ON c1.mukey = mu1.mukey AND majcompflag = 'Yes'
+            AND c1.cokey =
+            (SELECT TOP 1 c2.cokey FROM component AS c2
+            INNER JOIN mapunit AS mm1 ON c2.mukey=mm1.mukey AND c2.mukey=mu1.mukey ORDER BY c2.comppct_r DESC, c2.cokey)
+            SELECT cokey, SUM_COMP_PCT, CASE WHEN comppct_r = SUM_COMP_PCT THEN 1
+            ELSE CAST (CAST (comppct_r AS  decimal (5,2)) / CAST (SUM_COMP_PCT AS decimal (5,2)) AS decimal (5,2)) END AS WEIGHTED_COMP_PCT
+            INTO #comp_temp3
+            FROM #comp_temp
+            SELECT areasymbol, musym, muname, mu.mukey/1  AS MUKEY, c.cokey AS COKEY, ch.chkey/1 AS CHKEY, compname, hzname, hzdept_r, hzdepb_r, CASE WHEN hzdept_r < """ + tDep + """ THEN """ + tDep + """ ELSE hzdept_r END AS hzdept_r_ADJ,
+            CASE WHEN hzdepb_r > """ + bDep + """  THEN """ + bDep + """ ELSE hzdepb_r END AS hzdepb_r_ADJ,
+            CAST (CASE WHEN hzdepb_r > """ + bDep + """  THEN """ + bDep + """ ELSE hzdepb_r END - CASE WHEN hzdept_r <""" + tDep + """ THEN """ + tDep + """ ELSE hzdept_r END AS decimal (5,2)) AS thickness,
+            comppct_r,
+            CAST (SUM (CASE WHEN hzdepb_r > """ + bDep + """  THEN """ + bDep + """ ELSE hzdepb_r END - CASE WHEN hzdept_r <""" + tDep + """ THEN """ + tDep + """ ELSE hzdept_r END) over(partition by c.cokey) AS decimal (5,2)) AS sum_thickness,
+            CAST (ISNULL (""" + aProp + """ , 0) AS decimal (5,2))AS """ + aProp + """
+            INTO #main
+            FROM legend  AS l
+            INNER JOIN  mapunit AS mu ON mu.lkey = l.lkey AND l.areasymbol IN (""" + areaReq + """)
+            INNER JOIN  component AS c ON c.mukey = mu.mukey
+            INNER JOIN chorizon AS ch ON ch.cokey=c.cokey AND hzname NOT LIKE '%O%'AND hzname NOT LIKE '%r%'
+            AND hzdepb_r >""" + tDep + """ AND hzdept_r <""" + bDep + """
+            INNER JOIN chtexturegrp AS cht ON ch.chkey=cht.chkey  WHERE cht.rvindicator = 'yes' AND  ch.hzdept_r IS NOT NULL
+            AND
+            texture NOT LIKE '%PM%' and texture NOT LIKE '%DOM' and texture NOT LIKE '%MPT%' and texture NOT LIKE '%MUCK' and texture NOT LIKE '%PEAT%' and texture NOT LIKE '%br%' and texture NOT LIKE '%wb%'
+            ORDER BY areasymbol, musym, muname, mu.mukey, comppct_r DESC, cokey,  hzdept_r, hzdepb_r
+            SELECT #main.areasymbol, #main.musym, #main.muname, #main.MUKEY,
+            #main.COKEY, #main.CHKEY, #main.compname, hzname, hzdept_r, hzdepb_r, hzdept_r_ADJ, hzdepb_r_ADJ, thickness, sum_thickness, """ + aProp + """ , comppct_r, SUM_COMP_PCT, WEIGHTED_COMP_PCT ,
+            SUM((thickness/sum_thickness ) * """ + aProp + """)over(partition by #main.COKEY)AS COMP_WEIGHTED_AVERAGE
+            INTO #comp_temp2
+            FROM #main
+            INNER JOIN #comp_temp3 ON #comp_temp3.cokey=#main.cokey
+            ORDER BY #main.areasymbol, #main.musym, #main.muname, #main.MUKEY, comppct_r DESC,  #main.COKEY,  hzdept_r, hzdepb_r
+            SELECT #comp_temp2.MUKEY,#comp_temp2.COKEY, WEIGHTED_COMP_PCT * COMP_WEIGHTED_AVERAGE AS COMP_WEIGHTED_AVERAGE1
+            INTO #last_step
+            FROM #comp_temp2
+            GROUP BY  #comp_temp2.MUKEY,#comp_temp2.COKEY, WEIGHTED_COMP_PCT, COMP_WEIGHTED_AVERAGE
+            SELECT areasymbol, musym, muname,
+            #kitchensink.mukey, #last_step.COKEY,
+            CAST (SUM (COMP_WEIGHTED_AVERAGE1) over(partition by #kitchensink.mukey) as decimal(5,2))AS """ + aProp + """
+            INTO #last_step2
+            FROM #last_step
+            RIGHT OUTER JOIN #kitchensink ON #kitchensink.mukey=#last_step.mukey
+            GROUP BY #kitchensink.areasymbol, #kitchensink.musym, #kitchensink.muname, #kitchensink.mukey, COMP_WEIGHTED_AVERAGE1, #last_step.COKEY
+            ORDER BY #kitchensink.areasymbol, #kitchensink.musym, #kitchensink.muname, #kitchensink.mukey
+            SELECT #last_step2.areasymbol, #last_step2.musym, #last_step2.muname,
+            #last_step2.mukey, #last_step2.""" + aProp + """
+            FROM #last_step2
+            LEFT OUTER JOIN #last_step ON #last_step.mukey=#last_step2.mukey
+            GROUP BY #last_step2.areasymbol, #last_step2.musym, #last_step2.muname, #last_step2.mukey, #last_step2.""" + aProp + """
+            ORDER BY #last_step2.areasymbol, #last_step2.musym, #last_step2.muname, #last_step2.mukey, #last_step2.""" + aProp
         elif aggMethod == "Dominant Condition":
-            propQry = "SELECT areasymbol, musym, muname, mu.mukey/1  AS mukey,\n"\
-            " (SELECT TOP 1 " + aProp + "\n"\
-            " FROM mapunit\n"\
-            " INNER JOIN component ON component.mukey=mapunit.mukey\n"\
-            " AND mapunit.mukey = mu.mukey\n"\
-            " GROUP BY " + aProp + ", comppct_r ORDER BY SUM(comppct_r) over(partition by " + aProp + ") DESC) AS " + aProp + "\n"\
-            " FROM legend  AS l\n"\
-            " INNER JOIN  mapunit AS mu ON mu.lkey = l.lkey AND  l.areasymbol LIKE '" + areaSym + "'\n"\
-            " INNER JOIN  component AS c ON c.mukey = mu.mukey\n"\
-            " AND c.cokey =\n"\
-            " (SELECT TOP 1 c1.cokey FROM component AS c1\n"\
-            " INNER JOIN mapunit ON c.mukey=mapunit.mukey AND c1.mukey=mu.mukey ORDER BY c1.comppct_r DESC, c1.cokey)\n"\
-            " GROUP BY areasymbol, musym, muname, mu.mukey, c.cokey,  compname, comppct_r\n"\
-            " ORDER BY areasymbol, musym, muname, mu.mukey, comppct_r DESC, c.cokey\n"\
+            propQry = """SELECT areasymbol, musym, muname, mu.mukey/1  AS mukey,
+            (SELECT TOP 1 """ + aProp + """
+            FROM mapunit
+            INNER JOIN component ON component.mukey=mapunit.mukey
+            AND mapunit.mukey = mu.mukey
+            GROUP BY """ + aProp + """, comppct_r ORDER BY SUM(comppct_r) over(partition by """ + aProp + """) DESC) AS """ + aProp + """
+            FROM legend  AS l
+            INNER JOIN  mapunit AS mu ON mu.lkey = l.lkey AND  l.areasymbol IN (""" + areaReq + """)
+            INNER JOIN  component AS c ON c.mukey = mu.mukey
+            AND c.cokey =
+            (SELECT TOP 1 c1.cokey FROM component AS c1
+            INNER JOIN mapunit ON c.mukey=mapunit.mukey AND c1.mukey=mu.mukey ORDER BY c1.comppct_r DESC, c1.cokey)
+            GROUP BY areasymbol, musym, muname, mu.mukey, c.cokey,  compname, comppct_r
+            ORDER BY areasymbol, musym, muname, mu.mukey, comppct_r DESC, c.cokey"""
 
-        #PrintMsg(propQry.replace("&gt;", ">").replace("&lt;", "<"))
-        #arcpy.AddMessage(' \n \n ')
-        # send JSON POSTREST request to Soil Data Access
-        # and collect results into a dictionary
-        #arcpy.AddMessage("\nSending JSON request...")
+        # PrintMsg(propQry.replace("&gt;", ">").replace("&lt;", "<"))
+        # arcpy.AddMessage(' \n \n ')
+
 
         theURL = "https://sdmdataaccess.nrcs.usda.gov"
         url = theURL + "/Tabular/SDMTabularService/post.rest"
@@ -258,9 +256,6 @@ def getProps(aProp, areaSym, aggMethod, tDep, bDep, mmC):
         # get rid of objects
         del qResults, response, req
 
-        # Once data section (key='Table') is found in result...
-        valList = []
-
         # if dictionary key "Table" is found
         if "Table" in qData:
             cResponse = 'OK'
@@ -270,7 +265,6 @@ def getProps(aProp, areaSym, aggMethod, tDep, bDep, mmC):
         else:
             cResponse = 'Failed'
             return False, None, cResponse
-
 
     except socket.timeout as e:
         Msg = 'Soil Data Access timeout error'
@@ -289,7 +283,7 @@ def getProps(aProp, areaSym, aggMethod, tDep, bDep, mmC):
         return False, None, Msg
     except:
         errorMsg()
-        Msg = 'Unknown error collecting interpreations for ' + eSSA
+        Msg = 'Unknown error collecting interpreations for ' + state
         return False, Msg, None
 
 def CreateNewTable(newTable, columnNames, columnInfo):
@@ -359,7 +353,7 @@ from urllib2 import HTTPError, URLError
 
 arcpy.env.overwriteOutput = True
 
-
+# separate stock msgs from tool msgs
 PrintMsg('\n \n')
 
 areaParam = arcpy.GetParameterAsText(1)
@@ -382,7 +376,6 @@ jLayer = arcpy.GetParameterAsText(8)
 #arcpy.AddMessage(nullParam)
 srcDir = os.path.dirname(sys.argv[0])
 
-
 if aggMethod == 'Dominant Component (Category)':
     aggMod = '_dom_comp_cat'
 elif aggMethod == 'Dominant Component (Numeric)':
@@ -399,11 +392,14 @@ else:
 
 try:
     areaList = areaParam.split(";")
+    states = list(set([s[:2] for s in areaList]))
+    states.sort()
+
     propLst = propParam.split(";")
 
     failProps = list()
 
-    jobCnt = len(areaList)*len(propLst)
+    jobCnt = len(states)*len(propLst)
 
     n=0
     arcpy.SetProgressor('step', 'Starting Soil Data Access Properties Tool...', 0, jobCnt, 1)
@@ -424,32 +420,32 @@ try:
         elif aggMethod == "Dominant Condition":
             tblName = 'tbl_' + outTbl + aggMod
 
-
-
-        #convert to NASIS speak i.e. Bulk Density =db
+        #convert to NASIS speak i.e. Bulk Density = db
         propVal = rslvProps(prop).strip()
 
-
         arcpy.AddMessage("Running: " + propVal)
-##        if interp.find("{:}") <> -1:
-##            interp = interp.replace("{:}", ";")
+       # if interp.find("{:}") <> -1:
+       #     interp = interp.replace("{:}", ";")
 
-        for eSSA in areaList:
+        # for eSSA in areaList:
+        for state in states:
+            p = [x for x in areaList if x[:2]==state]
+            theReq = ",".join(map("'{0}'".format, p))
             n = n + 1
-            arcpy.SetProgressorLabel('Collecting ' + prop + ' for: ' + eSSA + " (" + str(n) + ' of ' + str(jobCnt) + ')')
+            arcpy.SetProgressorLabel('Collecting ' + prop + ' for: ' + state + " (" + str(n) + ' of ' + str(jobCnt) + ')')
 
             #send the request
-            propLogic, propData, propMsg = getProps(propVal, eSSA, aggMethod, tDep, bDep, mmC)
+            propLogic, propData, propMsg = getProps(propVal, theReq, aggMethod, tDep, bDep, mmC)
 
             #if it was successful...
             if propLogic:
                 if len(propData) == 0:
                     #PrintMsg('Response for ' + interp + ' on ' + eSSA + ' = ' + propMsg)
-                    PrintMsg('No records returned for ' + eSSA + ': ' + propVal, 1)
-                    failProps.append(eSSA + ":" + propVal)
+                    PrintMsg('No records returned for ' + state + ': ' + propVal, 1)
+                    failProps.append(state + ":" + propVal)
                     arcpy.SetProgressorPosition()
                 else:
-                    PrintMsg('Response for ' + propVal + ' on ' + eSSA + ' = ' + propMsg)
+                    PrintMsg('Response for ' + propVal + ' on ' + state + ' = ' + propMsg)
 
                     propRes = propData["Table"]
                     #arcpy.AddMessage(propRes)
@@ -483,16 +479,16 @@ try:
             else:
                 #try again
                 #PrintMsg('Failed first attempt running ' + prop + ' for ' + eSSA + '. Resubmitting request.', 1)
-                propLogic, propData, propMsg = getProps(propVal, eSSA, aggMethod, tDep, bDep, mmC)
+                propLogic, propData, propMsg = getProps(propVal, theReq, aggMethod, tDep, bDep, mmC)
 
                 #if 2nd run was successful
                 if propLogic:
                     if len(propData) == 0:
-                        PrintMsg('No records returned for ' + eSSA + ': ' + propVal, 1)
-                        failProps.append(eSSA + ":" + propVal)
+                        PrintMsg('No records returned for ' + state + ': ' + propVal, 1)
+                        failProps.append(state + ":" + propVal)
                         arcpy.SetProgressorPosition()
                     else:
-                        PrintMsg('Response for ' + propVal + ' on ' + eSSA + ' = ' + propMsg + ' - 2nd attempt')
+                        PrintMsg('Response for ' + propVal + ' on ' + state + ' = ' + propMsg + ' - 2nd attempt')
                         if not arcpy.Exists(WS + os.sep + tblName):
 
                             columnNames = propRes.pop(0)
@@ -517,10 +513,10 @@ try:
 
                             arcpy.SetProgressorPosition()
 
-                #if 2nd run was unsuccesful that's' it
+                # if 2nd run was unsuccesful that's' it
                 else:
                     PrintMsg(propData)
-                    failProps.append(eSSA + ":" + propVal)
+                    failProps.append(state + ":" + propVal)
                     arcpy.SetProgressorPosition()
 
 

@@ -120,10 +120,8 @@ def getHyd(areaSym):
 
     import socket
     from urllib2 import HTTPError, URLError
-    funcDict = dict()
 
     try:
-        #fldLst = ['AREASYMBOL', 'MUKEY', 'int_MUKEY', 'MUSYM', 'MUNAME', 'HYDRIC_RATING']
 
         hydQry = \
         """SELECT
@@ -164,7 +162,7 @@ def getHyd(areaSym):
         AND hydricrating  IS NULL ) AS hydric_null
         INTO #main_query
         FROM legend  AS l
-        INNER JOIN  mapunit AS mu ON mu.lkey = l.lkey AND  l.areasymbol LIKE '"""+ areaSym + """'
+        INNER JOIN  mapunit AS mu ON mu.lkey = l.lkey AND  l.areasymbol IN ("""+ areaSym + """)
 
 
         SELECT  AREASYMBOL, MUKEY, MUSYM, MUNAME,
@@ -198,7 +196,6 @@ def getHyd(areaSym):
         code = response.getcode()
         cResponse = bhrh.responses.get(code)
         cResponse = "{}; {}".format(cResponse[0], cResponse[1])
-        print cResponse
 
         # read query results
         qResults = response.read()
@@ -206,11 +203,8 @@ def getHyd(areaSym):
         # Convert the returned JSON string into a Python dictionary.
         qData = json.loads(qResults)
 
-        #print qData
-
         # get rid of objects
         del qResults, response, req
-
 
         # if dictionary key "Table" is found
         if "Table" in qData:
@@ -227,15 +221,15 @@ def getHyd(areaSym):
         return False, None, Msg
 
     except socket.error as e:
-        Msg = 'Socket error: ' + str(e)
+        Msg = state + " = " + str(e)
         return False, None, Msg
 
     except HTTPError as e:
-        Msg = 'HTTP Error' + str(e)
+        Msg = state + " = " + str(e)
         return False, None, Msg
 
     except URLError as e:
-        Msg = 'URL Error' + str(e)
+        Msg = state + " = " + str(e)
         return False, None, Msg
 
     except:
@@ -262,10 +256,12 @@ srcDir = os.path.dirname(sys.argv[0])
 
 try:
     areaList = areaParam.split(";")
+    states = list(set([s[:2] for s in areaList]))
+    states.sort()
 
     failHyd = list()
 
-    jobCnt = len(areaList)
+    jobCnt = len(states)
 
     n=0
     
@@ -274,21 +270,26 @@ try:
     tblName = "SOD_hydricrating"
     
 
-    for eSSA in areaList:
-        n = n + 1
-        arcpy.SetProgressorLabel('Collecting parent material table for: ' + eSSA + " (" + str(n) + ' of ' + str(jobCnt) + ')')
+    # for eSSA in areaList:
+    for state in states:
+        p = [x for x in areaList if x[:2] == state]
+        theReq = ",".join(map("'{0}'".format, p))
+
+        n+=1
+
+        arcpy.SetProgressorLabel('Collecting parent material table for: ' + state + " (" + str(n) + ' of ' + str(jobCnt) + ')')
 
         #send the request
-        hydLogic, hydData, hydMsg = getHyd(eSSA)
+        hydLogic, hydData, hydMsg = getHyd(theReq)
 
         #if it was successful...
         if hydLogic:
             if len(hydData) == 0:
-                AddMsgAndPrint('No records returned for ' + eSSA, 1)
-                failHyd.append(eSSA )
+                AddMsgAndPrint('No records returned for ' + state, 1)
+                failHyd.append(state)
                 arcpy.SetProgressorPosition()
             else:
-                AddMsgAndPrint('Response for hydric summary request on ' + eSSA + ' = ' + hydMsg)
+                AddMsgAndPrint('Response for hydric summary request on ' + state + ' = ' + hydMsg)
                 hydRes = hydData["Table"]
 
                 if not arcpy.Exists(WS + os.sep + tblName):
@@ -320,16 +321,16 @@ try:
         #if it was unsuccessful...
         else:
             #try again
-            hydLogic, hydData, hydMsg = getHyd(eSSA)
+            hydLogic, hydData, hydMsg = getHyd(theReq)
 
             #if 2nd run was successful
             if hydLogic:
                 if len(hydData) == 0:
-                    AddMsgAndPrint('No records returned for ' + eSSA , 1)
-                    failHyd.append(eSSA )
+                    AddMsgAndPrint('No records returned for ' + state , 1)
+                    failHyd.append(state)
                     arcpy.SetProgressorPosition()
                 else:
-                    AddMsgAndPrint('Response for hydric summary request on '  + eSSA + ' = ' + hydMsg + ' - 2nd attempt')
+                    AddMsgAndPrint('Response for hydric summary request on '  + state + ' = ' + hydMsg + ' - 2nd attempt')
                     hydRes = hydData["Table"]
 
                     if not arcpy.Exists(WS + os.sep + tblName):
@@ -360,8 +361,8 @@ try:
 
             #if 2nd run was unsuccesful that's' it
             else:
-                AddMsgAndPrint('Response for hydric summary request on '  + eSSA + ' = ' + hydMsg + ' - 2nd attempt')
-                failHyd.append(eSSA)
+                AddMsgAndPrint('Response for hydric summary request on '  + state + ' = ' + hydMsg + ' - 2nd attempt')
+                failHyd.append(state)
                 arcpy.SetProgressorPosition()
 
     arcpy.AddMessage('\n')

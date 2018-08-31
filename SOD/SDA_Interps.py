@@ -147,7 +147,7 @@ def getIntrps(interp, areaSym, aggMethod):
                 ORDER BY interphr DESC, interphrc
                 FOR XML PATH('') ), 3, 1000) )as reason
                 FROM legend  AS l
-                INNER JOIN  mapunit AS mu ON mu.lkey = l.lkey AND l.areasymbol LIKE '""" + areaSym + """'
+                INNER JOIN  mapunit AS mu ON mu.lkey = l.lkey AND l.areasymbol IN (""" + areaSym + """)
                 INNER JOIN  component AS c ON c.mukey = mu.mukey  AND c.cokey = (SELECT TOP 1 c1.cokey FROM component AS c1
                 INNER JOIN mapunit ON c.mukey=mapunit.mukey AND c1.mukey=mu.mukey ORDER BY c1.comppct_r DESC, c1.cokey)"""
 
@@ -175,7 +175,7 @@ def getIntrps(interp, areaSym, aggMethod):
 
 
             FROM legend  AS l
-            INNER JOIN  mapunit AS mu ON mu.lkey = l.lkey AND l.areasymbol LIKE '""" + areaSym + """'
+            INNER JOIN  mapunit AS mu ON mu.lkey = l.lkey AND l.areasymbol IN (""" + areaSym + """)
             INNER JOIN  component AS c ON c.mukey = mu.mukey AND c.cokey =
             (SELECT TOP 1 c1.cokey FROM component AS c1
             INNER JOIN mapunit ON c.mukey=mapunit.mukey AND c1.mukey=mu.mukey ORDER BY c1.comppct_r DESC, c1.cokey)
@@ -210,7 +210,7 @@ def getIntrps(interp, areaSym, aggMethod):
 
                 INTO #main
                 FROM legend  AS l
-                INNER JOIN  mapunit AS mu ON mu.lkey = l.lkey AND l.areasymbol LIKE '""" + areaSym + """'
+                INNER JOIN  mapunit AS mu ON mu.lkey = l.lkey AND l.areasymbol IN (""" + areaSym + """)
                 INNER JOIN  component AS c ON c.mukey = mu.mukey
                 GROUP BY  areasymbol, musym, muname, mu.mukey
 
@@ -230,16 +230,12 @@ def getIntrps(interp, areaSym, aggMethod):
                 FROM #main
                 DROP TABLE #main"""
 
-        #arcpy.AddMessage(interpQry.replace("&gt;", ">").replace("&lt;", "<"))
-        #arcpy.AddMessage(interpQry)
-        # Send XML query to SDM Access service
-
-        funcDict = dict()
+        # arcpy.AddMessage(interpQry.replace("&gt;", ">").replace("&lt;", "<"))
+        # arcpy.AddMessage(interpQry)
 
         theURL = "https://sdmdataaccess.nrcs.usda.gov"
         url = theURL + "/Tabular/SDMTabularService/post.rest"
 
-        # Create request using JSON, return data as JSON
         request = {}
         request["format"] = "JSON+COLUMNNAME+METADATA"
         request["query"] = interpQry
@@ -291,7 +287,7 @@ def getIntrps(interp, areaSym, aggMethod):
 
     except:
         errorMsg()
-        Msg = 'Unknown error collecting interpreations for ' + eSSA
+        Msg = 'Unknown error collecting interpreations for ' + state
         return False, None, Msg
 
 #===============================================================================
@@ -325,11 +321,14 @@ else:
 try:
 
     areaList = areaParam.split(";")
+    states = list(set([s[:2] for s in areaList]))
+    states.sort()
+
     interpLst = interpParam.split(";")
 
     failInterps = list()
 
-    jobCnt = len(areaList)*len(interpLst)
+    jobCnt = len(states)*len(interpLst)
 
     n=0
     arcpy.SetProgressor('step', 'Starting Soil Data Access Dominant Component Tool...', 0, jobCnt, 1)
@@ -344,20 +343,23 @@ try:
         if interp.find("{:}") <> -1:
             interp = interp.replace("{:}", ";")
 
-        for eSSA in areaList:
+        # for eSSA in areaList:
+        for state in states:
+            p = [x for x in areaList if x[:2] == state]
+            theReq = ",".join(map("'{0}'".format, p))
             n = n + 1
-            arcpy.SetProgressorLabel('Collecting ' + interp + ' for: ' + eSSA + " (" + str(n) + ' of ' + str(jobCnt)+ ')')
+            arcpy.SetProgressorLabel('Collecting ' + interp + ' for: ' + state + " (" + str(n) + ' of ' + str(jobCnt)+ ')')
 
             #send the request
-            intrpLogic, intrpData, intrpMsg = getIntrps(interp, eSSA, aggMethod)
+            intrpLogic, intrpData, intrpMsg = getIntrps(interp, theReq, aggMethod)
 
             #if it was successful...
             if intrpLogic:
                 if len(intrpData) == 0:
-                    AddMsgAndPrint('No records returned for ' + eSSA + ': ' + interp, 1)
-                    failInterps.append(eSSA + ":" + interp)
+                    AddMsgAndPrint('No records returned for ' + state + ': ' + interp, 1)
+                    failInterps.append(state + ":" + interp)
                 else:
-                    AddMsgAndPrint('Response for ' + interp + ' on ' + eSSA + ' = ' + intrpMsg)
+                    AddMsgAndPrint('Response for ' + interp + ' on ' + state + ' = ' + intrpMsg)
 
                     intRes = intrpData["Table"]
                     # arcpy.AddMessage(propRes)
@@ -392,13 +394,13 @@ try:
             else:
                 #try again
                 #AddMsgAndPrint('Failed first attempt running ' + interp + ' for ' + eSSA + '. Resubmitting request.', 1)
-                intrpLogic, intrpData, intrpMsg = getIntrps(interp, eSSA, aggMethod)
+                intrpLogic, intrpData, intrpMsg = getIntrps(interp, theReq, aggMethod)
                 if intrpLogic:
                     if len(intrpData) == 0:
-                        AddMsgAndPrint('No records returned for ' + eSSA + ': ' + interp, 1)
-                        failInterps.append(eSSA + ":" + interp)
+                        AddMsgAndPrint('No records returned for ' + state + ': ' + interp, 1)
+                        failInterps.append(state + ":" + interp)
                     else:
-                        AddMsgAndPrint('Response for ' + interp + ' on ' + eSSA + ' = ' + intrpMsg + ' - 2nd attempt')
+                        AddMsgAndPrint('Response for ' + interp + ' on ' + state + ' = ' + intrpMsg + ' - 2nd attempt')
 
                         intRes = intrpData["Table"]
                         # arcpy.AddMessage(propRes)
@@ -431,8 +433,8 @@ try:
 
                 #if 2nd run was unsuccesful that's' it
                 else:
-                    AddMsgAndPrint('Response for ' + interp + ' on ' + eSSA + ' = ' + intrpMsg + ' - 2nd attempt')
-                    failInterps.append(eSSA + ":" + interp)
+                    AddMsgAndPrint('Response for ' + interp + ' on ' + state + ' = ' + intrpMsg + ' - 2nd attempt')
+                    failInterps.append(state + ":" + interp)
                     arcpy.SetProgressorPosition()
 
 
