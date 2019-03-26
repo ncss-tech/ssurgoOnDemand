@@ -117,7 +117,7 @@ def CreateNewTable(newTable, columnNames, columnInfo):
     return False
 
 
-def getPMgrp(areaSym, dBool):
+def getPMgrp(state, dBool):
 
     import socket
     from BaseHTTPServer import BaseHTTPRequestHandler as bhrh
@@ -247,7 +247,7 @@ def getPMgrp(areaSym, dBool):
 
 
              FROM sacatalog
-             INNER JOIN legend  ON legend.areasymbol = sacatalog.areasymbol AND sacatalog.areasymbol IN (""" + areaSym + """)
+             INNER JOIN legend  ON legend.areasymbol = sacatalog.areasymbol AND left(sacatalog.areasymbol, 2) = '""" + state + """'
              INNER JOIN mapunit  ON mapunit.lkey = legend.lkey
              INNER JOIN component AS c ON c.mukey = mapunit.mukey AND c.cokey =
              (SELECT TOP 1 c1.cokey FROM component AS c1
@@ -266,7 +266,7 @@ def getPMgrp(areaSym, dBool):
              pmgroupname
 
              FROM sacatalog
-             INNER JOIN legend  ON legend.areasymbol = sacatalog.areasymbol AND sacatalog.areasymbol IN (""" + areaSym + """)
+             INNER JOIN legend  ON legend.areasymbol = sacatalog.areasymbol AND left(sacatalog.areasymbol, 2) = '""" + state + """'
              INNER JOIN mapunit  ON mapunit.lkey = legend.lkey
              INNER JOIN component AS c ON c.mukey = mapunit.mukey AND c.cokey =
              (SELECT TOP 1 c1.cokey FROM component AS c1
@@ -274,7 +274,7 @@ def getPMgrp(areaSym, dBool):
              INNER JOIN copmgrp ON copmgrp.cokey=c.cokey"""
 
 
-        #arcpy.AddMessage(pmQry)
+        arcpy.AddMessage(pmQry)
         #theURL = "https://sdmdataaccess.nrcs.usda.gov"
         #url = theURL + "/Tabular/SDMTabularService/post.rest"
         url = r'https://SDMDataAccess.sc.egov.usda.gov/Tabular/post.rest'
@@ -371,8 +371,8 @@ try:
 
     # for eSSA in areaList:
     for state in states:
-        p = [x for x in areaList if x[:2] == state]
-        theReq = ",".join(map("'{0}'".format, p))
+        #p = [x for x in areaList if x[:2] == state]
+        #theReq = ",".join(map("'{0}'".format, p))
 
         n = n + 1
 
@@ -380,7 +380,7 @@ try:
 
         #send the request
         #True, funcDict, cResponse
-        pmLogic, pmData, pmMsg = getPMgrp(theReq, dBool)
+        pmLogic, pmData, pmMsg = getPMgrp(state, dBool)
 
         #if it was successful...
         if pmLogic:
@@ -421,7 +421,7 @@ try:
         #if it was unsuccessful...
         else:
             #try again
-            pmLogic, pmData, pmMsg = getPMgrp(theReq, dBool)
+            pmLogic, pmData, pmMsg = getPMgrp(state, dBool)
 
             #if 2nd run was successful
             if pmLogic:

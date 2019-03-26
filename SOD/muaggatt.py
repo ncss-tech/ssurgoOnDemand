@@ -61,6 +61,7 @@ def CreateNewTable(newTable, columnNames, columnInfo):
     # MUKEY would normally be included in the list, but it should already exist in the output featureclass
     #
     try:
+
         # Dictionary: SQL Server to FGDB
         dType = dict()
 
@@ -210,6 +211,8 @@ jLayer = arcpy.GetParameterAsText(3)
 srcDir = os.path.dirname(sys.argv[0])
 
 tblName = 'SOD_muaggat'
+if arcpy.Exists(WS + os.sep + tblName):
+    arcpy.management.Delete(newTable)
 
 try:
     areaList = areaParam.split(";")
