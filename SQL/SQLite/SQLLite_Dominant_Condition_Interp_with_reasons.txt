@@ -1,0 +1,28 @@
+ SELECT areasymbol, musym, muname, mu.mukey/1  AS MUKEY, 
+
+ (SELECT ROUND (AVG(interphr) over(partition by interphrc),2)
+ FROM mapunit
+ INNER JOIN component ON component.mukey=mapunit.mukey
+ INNER JOIN cointerp ON component.cokey = cointerp.cokey AND mapunit.mukey = mu.mukey AND ruledepth = 0 AND mrulename LIKE 'FOR - Mechanical Planting Suitability' GROUP BY interphrc, interphr
+ ORDER BY SUM (comppct_r) DESC LIMIT 1)as rating,
+ (SELECT interphrc
+ FROM mapunit
+ INNER JOIN component ON component.mukey=mapunit.mukey
+ INNER JOIN cointerp ON component.cokey = cointerp.cokey AND mapunit.mukey = mu.mukey AND ruledepth = 0 AND mrulename LIKE 'FOR - Mechanical Planting Suitability'
+ GROUP BY interphrc, comppct_r ORDER BY SUM(comppct_r) over(partition by interphrc) DESC LIMIT 1) as class,
+ 
+  (SELECT GROUP_CONCAT( DISTINCT interphrc)
+FROM mapunit
+INNER JOIN component ON component.mukey=mapunit.mukey AND compkind != 'miscellaneous area' AND component.cokey=c.cokey
+INNER JOIN cointerp ON component.cokey = cointerp.cokey AND mapunit.mukey = mu.mukey 
+AND ruledepth != 0 AND interphrc NOT LIKE 'Not%' AND mrulename LIKE 'FOR - Mechanical Planting Suitability' GROUP BY interphrc
+ORDER BY interphr DESC, interphrc
+ )as reason
+  
+ FROM legend  AS l
+ INNER JOIN  mapunit AS mu ON mu.lkey = l.lkey 
+ INNER JOIN  component AS c ON c.mukey = mu.mukey AND c.cokey =
+ (SELECT  c1.cokey FROM component AS c1
+ INNER JOIN mapunit ON c.mukey=mapunit.mukey AND c1.mukey=mu.mukey ORDER BY c1.comppct_r DESC, c1.cokey LIMIT 1)
+ ORDER BY areasymbol, musym, muname, mu.mukey
+ 
