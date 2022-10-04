@@ -1,0 +1,98 @@
+if method == 'dom_comp':
+    q = """-- dominant component
+    SELECT areasymbol, musym, muname, mu.mukey  AS mukey,
+    (SELECT interphr FROM component INNER JOIN cointerp ON component.cokey = cointerp.cokey AND component.cokey = c.cokey AND ruledepth = 0 AND mrulename LIKE '""" + interp + """') as rating,
+    (SELECT interphrc FROM component INNER JOIN cointerp ON component.cokey = cointerp.cokey AND component.cokey = c.cokey AND ruledepth = 0 AND mrulename LIKE '""" + interp + """') as class,
+    (SELECT DISTINCT SUBSTRING(  (  SELECT ( '; ' + interphrc)
+    FROM mapunit
+    INNER JOIN component ON component.mukey=mapunit.mukey AND compkind != 'miscellaneous area' AND component.cokey=c.cokey
+    INNER JOIN cointerp ON component.cokey = cointerp.cokey AND mapunit.mukey = mu.mukey
+    AND ruledepth != 0 AND interphrc NOT LIKE 'Not%' AND mrulename LIKE '""" + interp + """' GROUP BY interphrc, interphr
+    ORDER BY interphr DESC, interphrc
+    FOR XML PATH('') ), 3, 1000) )as reason
+    FROM legend  AS l
+    INNER JOIN  mapunit AS mu ON mu.lkey = l.lkey AND mu.mukey IN (""" + keys + """)
+    INNER JOIN  component AS c ON c.mukey = mu.mukey  AND c.cokey = (SELECT TOP 1 c1.cokey FROM component AS c1
+    INNER JOIN mapunit ON c.mukey=mapunit.mukey AND c1.mukey=mu.mukey ORDER BY c1.comppct_r DESC, c1.cokey)"""
+
+if method == "dom_cond":
+    q = """-- dominant condition
+    SELECT areasymbol, musym, muname, mu.mukey/1  AS mukey,
+    (SELECT TOP 1 ROUND (AVG(interphr) over(partition by interphrc),2)
+    FROM mapunit
+    INNER JOIN component ON component.mukey=mapunit.mukey
+    INNER JOIN cointerp ON component.cokey = cointerp.cokey AND mapunit.mukey = mu.mukey AND ruledepth = 0 AND mrulename LIKE '""" + interp + """' GROUP BY interphrc, interphr
+    ORDER BY SUM (comppct_r) DESC)as rating,
+    (SELECT TOP 1 interphrc
+    FROM mapunit
+    INNER JOIN component ON component.mukey=mapunit.mukey
+    INNER JOIN cointerp ON component.cokey = cointerp.cokey AND mapunit.mukey = mu.mukey AND ruledepth = 0 AND mrulename LIKE '""" + interp + """'
+    GROUP BY interphrc, comppct_r ORDER BY SUM(comppct_r) over(partition by interphrc) DESC) as class,
+
+    (SELECT DISTINCT SUBSTRING(  (  SELECT ( '; ' + interphrc)
+    FROM mapunit
+    INNER JOIN component ON component.mukey=mapunit.mukey AND compkind != 'miscellaneous area' AND component.cokey=c.cokey
+    INNER JOIN cointerp ON component.cokey = cointerp.cokey AND mapunit.mukey = mu.mukey
+
+    AND ruledepth != 0 AND interphrc NOT LIKE 'Not%' AND mrulename LIKE '""" + interp + """' GROUP BY interphrc, interphr
+    ORDER BY interphr DESC, interphrc
+    FOR XML PATH('') ), 3, 1000) )as reason
+
+
+    FROM legend  AS l
+    INNER JOIN  mapunit AS mu ON mu.lkey = l.lkey AND mu.mukey IN ( """ + keys + """)
+    INNER JOIN  component AS c ON c.mukey = mu.mukey AND c.cokey =
+    (SELECT TOP 1 c1.cokey FROM component AS c1
+    INNER JOIN mapunit ON c.mukey=mapunit.mukey AND c1.mukey=mu.mukey ORDER BY c1.comppct_r DESC, c1.cokey)
+    ORDER BY areasymbol, musym, muname, mu.mukey"""
+
+# weighted averge (default)
+if method == 'wtd_avg':
+  q = """--weighted average
+  SELECT areasymbol, musym, muname, mu.mukey/1  AS mukey,
+  (SELECT TOP 1 CASE WHEN ruledesign = 1 THEN 'limitation'
+  WHEN ruledesign = 2 THEN 'suitability' END
+  FROM mapunit
+  INNER JOIN component ON component.mukey=mapunit.mukey
+  INNER JOIN cointerp ON component.cokey = cointerp.cokey AND mapunit.mukey = mu.mukey AND ruledepth = 0 AND mrulename LIKE '""" + interp+"""'
+  GROUP BY mapunit.mukey, ruledesign) as design,
+  ROUND ((SELECT SUM (interphr * comppct_r)
+  FROM mapunit
+  INNER JOIN component ON component.mukey=mapunit.mukey
+  INNER JOIN cointerp ON component.cokey = cointerp.cokey AND mapunit.mukey = mu.mukey AND ruledepth = 0 AND mrulename LIKE '""" + interp+"""'
+  GROUP BY mapunit.mukey),2) as rating,
+  ROUND ((SELECT SUM (comppct_r)
+  FROM mapunit
+  INNER JOIN component ON component.mukey=mapunit.mukey
+  INNER JOIN cointerp ON component.cokey = cointerp.cokey AND mapunit.mukey = mu.mukey AND ruledepth = 0 AND mrulename LIKE '""" + interp+"""'
+  AND (interphr) IS NOT NULL GROUP BY mapunit.mukey),2) as sum_com,
+  (SELECT DISTINCT SUBSTRING(  (  SELECT ( '; ' + interphrc)
+  FROM mapunit
+  INNER JOIN component ON component.mukey=mapunit.mukey AND compkind != 'miscellaneous area'
+  INNER JOIN cointerp ON component.cokey = cointerp.cokey AND mapunit.mukey = mu.mukey
+
+  AND ruledepth != 0 AND interphrc NOT LIKE 'Not%' AND mrulename LIKE '""" + interp + """' GROUP BY interphrc
+  ORDER BY interphrc
+  FOR XML PATH('') ), 3, 1000) )as reason
+
+  INTO #main
+  FROM legend  AS l
+  INNER JOIN  mapunit AS mu ON mu.lkey = l.lkey AND mu.mukey IN ( """ + keys + """)
+  INNER JOIN  component AS c ON c.mukey = mu.mukey
+  GROUP BY  areasymbol, musym, muname, mu.mukey
+
+  SELECT areasymbol, musym, muname, MUKEY, ISNULL (ROUND ((rating/sum_com),2), 99) AS rating,
+  CASE WHEN rating IS NULL THEN 'Not Rated'
+  WHEN design = 'suitability' AND  ROUND ((rating/sum_com),2) < = 0 THEN 'Not suited'
+  WHEN design = 'suitability' AND  ROUND ((rating/sum_com),2)  > 0.001 and  ROUND ((rating/sum_com),2)  <=0.333 THEN 'Poorly suited'
+  WHEN design = 'suitability' AND  ROUND ((rating/sum_com),2)  > 0.334 and  ROUND ((rating/sum_com),2)  <=0.666  THEN 'Moderately suited'
+  WHEN design = 'suitability' AND  ROUND ((rating/sum_com),2)  > 0.667 and  ROUND ((rating/sum_com),2)  <=0.999  THEN 'Moderately well suited'
+  WHEN design = 'suitability' AND  ROUND ((rating/sum_com),2)   = 1  THEN 'Well suited'
+
+  WHEN design = 'limitation' AND  ROUND ((rating/sum_com),2) < = 0 THEN 'Not limited '
+  WHEN design = 'limitation' AND  ROUND ((rating/sum_com),2)  > 0.001 and  ROUND ((rating/sum_com),2)  <=0.333 THEN 'Slightly limited '
+  WHEN design = 'limitation' AND  ROUND ((rating/sum_com),2)  > 0.334 and  ROUND ((rating/sum_com),2)  <=0.666  THEN 'Somewhat limited '
+  WHEN design = 'limitation' AND  ROUND ((rating/sum_com),2)  > 0.667 and  ROUND ((rating/sum_com),2)  <=0.999  THEN 'Moderately limited '
+  WHEN design = 'limitation' AND  ROUND ((rating/sum_com),2)  = 1 THEN 'Very limited' END AS class, reason
+  FROM #main
+  DROP TABLE #main"""
