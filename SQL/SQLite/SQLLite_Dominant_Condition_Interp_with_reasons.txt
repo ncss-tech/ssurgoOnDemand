@@ -30,7 +30,7 @@ FROM[cointerp] WHERE mrulename = 'FOR - Mechanical Planting Suitability' ;
 FROM mapunit
 INNER JOIN component ON component.mukey=mapunit.mukey AND compkind != 'miscellaneous area' 
 INNER JOIN cointerp_lite ON component.cokey = cointerp_lite.cokey AND mapunit.mukey = mu.mukey 
-AND ruledepth != 0 AND interphrc NOT LIKE 'Not%' AND mrulename LIKE 'FOR - Mechanical Planting Suitability' GROUP BY interphrc
+AND ruledepth != 0 AND interphrc NOT LIKE 'Not%' AND mrulename LIKE 'FOR - Mechanical Planting Suitability' 
 ORDER BY interphr DESC, interphrc
  )as reason
   
