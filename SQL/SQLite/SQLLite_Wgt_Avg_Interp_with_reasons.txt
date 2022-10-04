@@ -1,4 +1,5 @@
-
+--weighted average
+DROP TABLE IF EXISTS main;
 DROP TABLE IF EXISTS cointerp_lite;
 
 CREATE TABLE cointerp_lite AS
@@ -10,32 +11,39 @@ SELECT  cokey
       ,interphr 
       ,interphrc
 	  ,cointerpkey
-
 FROM[cointerp] WHERE mrulename = 'FOR - Mechanical Planting Suitability' ;
 
 
- SELECT areasymbol, musym, muname, mu.mukey/1  AS mukey, 
- (SELECT ROUND (AVG(interphr) over(partition by interphrc),2)
- FROM mapunit
- INNER JOIN component ON component.mukey=mapunit.mukey
- INNER JOIN cointerp_lite ON component.cokey = cointerp_lite.cokey AND mapunit.mukey = mu.mukey AND ruledepth = 0 AND mrulename LIKE 'FOR - Mechanical Planting Suitability' GROUP BY interphrc, interphr
- ORDER BY SUM (comppct_r) DESC LIMIT 1)as rating,
- (SELECT interphrc
- FROM mapunit
- INNER JOIN component ON component.mukey=mapunit.mukey
- INNER JOIN cointerp_lite ON component.cokey = cointerp_lite.cokey AND mapunit.mukey = mu.mukey AND ruledepth = 0 AND mrulename LIKE 'FOR - Mechanical Planting Suitability'
- GROUP BY interphrc, comppct_r ORDER BY SUM(comppct_r) over(partition by interphrc) DESC LIMIT 1) as class,
- 
-  (SELECT GROUP_CONCAT( DISTINCT interphrc)
+        CREATE TABLE main AS    SELECT areasymbol, musym, muname, mu.mukey/1  AS mukey,
+
+            ROUND ((SELECT SUM (interphr * comppct_r)
+            FROM mapunit
+            INNER JOIN component ON component.mukey=mapunit.mukey
+            INNER JOIN cointerp_lite ON component.cokey = cointerp_lite.cokey AND mapunit.mukey = mu.mukey AND ruledepth = 0 AND mrulename LIKE 'FOR - Mechanical Planting Suitability'
+            GROUP BY mapunit.mukey),2) as rating,
+            ROUND ((SELECT SUM (comppct_r)
+            FROM mapunit
+            INNER JOIN component ON component.mukey=mapunit.mukey
+            INNER JOIN cointerp_lite ON component.cokey = cointerp_lite.cokey AND mapunit.mukey = mu.mukey AND ruledepth = 0 AND mrulename LIKE 'FOR - Mechanical Planting Suitability'
+            AND (interphr) IS NOT NULL GROUP BY mapunit.mukey),2) as sum_com, 
+			  (SELECT GROUP_CONCAT( DISTINCT interphrc)
 FROM mapunit
 INNER JOIN component ON component.mukey=mapunit.mukey AND compkind != 'miscellaneous area' 
-INNER JOIN cointerp_lite ON component.cokey = cointerp_lite.cokey AND mapunit.mukey = mu.mukey 
+INNER JOIN cointerp_lite ON component.cokey = cointerp_lite.cokey AND mapunit.mukey = c.mukey 
 AND ruledepth != 0 AND interphrc NOT LIKE 'Not%' AND mrulename LIKE 'FOR - Mechanical Planting Suitability' 
 ORDER BY interphr DESC, interphrc
  )as reason
-  
- FROM legend  AS l
- INNER JOIN  mapunit AS mu ON mu.lkey = l.lkey 
- ORDER BY areasymbol, musym, muname, mu.mukey
- 
+       
+            
+           
+            FROM legend  AS l
+            INNER JOIN  mapunit AS mu ON mu.lkey = l.lkey AND mu.mukey IN ( '279171')
+            INNER JOIN  component AS c ON c.mukey = mu.mukey
+            GROUP BY  areasymbol, musym, muname, mu.mukey;
+            
+ SELECT areasymbol, musym, muname,mukey, rating/sum_com AS wgt_rating,  reason
+FROM main 
 
+   -- SELECT areasymbol, musym, muname, m, ROUND ((rating/sum_com),2), 99) AS rating, reason
+   --        FROM main
+            --DROP TABLE #main
