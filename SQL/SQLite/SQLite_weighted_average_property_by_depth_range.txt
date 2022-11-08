@@ -33,7 +33,7 @@ DROP TABLE IF EXISTS main;
             CAST (IFNULL (claytotal_r, 0) AS decimal (5,2))AS claytotal_r
             
             FROM kitchensink  AS mu -- = 'VT013' --AND mu.mukey IN ('279217')
-            INNER JOIN  component AS c ON c.mukey = mu.mukey
+            INNER JOIN  component AS c ON c.mukey = mu.mukey AND majcompflag = 'Yes'	
             INNER JOIN chorizon AS ch ON ch.cokey=c.cokey AND hzname NOT LIKE '%O%'AND hzname NOT LIKE '%r%'
             AND hzdepb_r >0 AND hzdept_r <100
             INNER JOIN chtexturegrp AS cht ON ch.chkey=cht.chkey  WHERE cht.rvindicator = 'Yes' AND  ch.hzdept_r IS NOT NULL

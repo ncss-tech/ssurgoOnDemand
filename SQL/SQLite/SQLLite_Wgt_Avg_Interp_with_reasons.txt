@@ -18,17 +18,17 @@ FROM[cointerp] WHERE mrulename = 'FOR - Mechanical Planting Suitability' ;
 
             ROUND ((SELECT SUM (interphr * comppct_r)
             FROM mapunit
-            INNER JOIN component ON component.mukey=mapunit.mukey
+            INNER JOIN component ON component.mukey=mapunit.mukey AND majcompflag = 'Yes'
             INNER JOIN cointerp_lite ON component.cokey = cointerp_lite.cokey AND mapunit.mukey = mu.mukey AND ruledepth = 0 AND mrulename LIKE 'FOR - Mechanical Planting Suitability'
             GROUP BY mapunit.mukey),2) as rating,
             ROUND ((SELECT SUM (comppct_r)
             FROM mapunit
-            INNER JOIN component ON component.mukey=mapunit.mukey
+            INNER JOIN component ON component.mukey=mapunit.mukey AND majcompflag = 'Yes'
             INNER JOIN cointerp_lite ON component.cokey = cointerp_lite.cokey AND mapunit.mukey = mu.mukey AND ruledepth = 0 AND mrulename LIKE 'FOR - Mechanical Planting Suitability'
             AND (interphr) IS NOT NULL GROUP BY mapunit.mukey),2) as sum_com, 
 			  (SELECT GROUP_CONCAT( DISTINCT interphrc)
 FROM mapunit
-INNER JOIN component ON component.mukey=mapunit.mukey AND compkind != 'miscellaneous area' 
+INNER JOIN component ON component.mukey=mapunit.mukey AND compkind != 'miscellaneous area'  AND majcompflag = 'Yes'
 INNER JOIN cointerp_lite ON component.cokey = cointerp_lite.cokey AND mapunit.mukey = c.mukey 
 AND ruledepth != 0 AND interphrc NOT LIKE 'Not%' AND mrulename LIKE 'FOR - Mechanical Planting Suitability' 
 ORDER BY interphr DESC, interphrc
@@ -38,7 +38,7 @@ ORDER BY interphr DESC, interphrc
            
             FROM legend  AS l
             INNER JOIN  mapunit AS mu ON mu.lkey = l.lkey AND mu.mukey IN ( '279171')
-            INNER JOIN  component AS c ON c.mukey = mu.mukey
+            INNER JOIN  component AS c ON c.mukey = mu.mukey AND majcompflag = 'Yes'
             GROUP BY  areasymbol, musym, muname, mu.mukey;
             
  SELECT areasymbol, musym, muname,mukey, rating/sum_com AS wgt_rating,  reason
