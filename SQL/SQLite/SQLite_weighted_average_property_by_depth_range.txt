@@ -32,17 +32,17 @@
 	
 	CREATE TABLE temp_main AS
 		SELECT 
-	 areasymbol, musym, muname, mu.mukey/1  AS MUKEY, c.cokey AS COKEY, ch.chkey/1 AS CHKEY, compname, hzname, hzdept_r, hzdepb_r, CASE WHEN hzdept_r <0 THEN 0 ELSE hzdept_r END AS hzdept_r_ADJ, 
-		CASE WHEN hzdepb_r > 150  THEN 150 ELSE hzdepb_r END AS hzdepb_r_ADJ,
-		CAST (CASE WHEN hzdepb_r > 150  THEN 150 ELSE hzdepb_r END - CASE WHEN hzdept_r <0 THEN 0 ELSE hzdept_r END AS decimal (5,2)) AS thickness,
+	 areasymbol, musym, muname, mu.mukey/1  AS MUKEY, c.cokey AS COKEY, ch.chkey/1 AS CHKEY, compname, hzname, hzdept_r, hzdepb_r, CASE WHEN hzdept_r <42 THEN 42 ELSE hzdept_r END AS hzdept_r_ADJ, 
+		CASE WHEN hzdepb_r > 156  THEN 156 ELSE hzdepb_r END AS hzdepb_r_ADJ,
+		CAST (CASE WHEN hzdepb_r > 156  THEN 156 ELSE hzdepb_r END - CASE WHEN hzdept_r <42 THEN 42 ELSE hzdept_r END AS decimal (5,2)) AS thickness,
 		comppct_r, 
 
-		CAST (SUM (CASE WHEN hzdepb_r > 150  THEN 150 ELSE hzdepb_r END - CASE WHEN hzdept_r <0 THEN 0 ELSE hzdept_r END) over(partition by c.cokey) AS decimal (5,2)) AS sum_thickness, 
-		CAST (IFNULL (claytotal_r, 0) AS decimal (5,2))AS claytotal_r
+		CAST (SUM (CASE WHEN hzdepb_r > 156 THEN 156 ELSE hzdepb_r END - CASE WHEN hzdept_r <42 THEN 42 ELSE hzdept_r END) over(partition by c.cokey) AS decimal (5,2)) AS sum_thickness, 
+		CAST (IFNULL (claytotal_r, 42) AS decimal (5,2))AS claytotal_r
 		FROM kitchensink AS mu
 		INNER JOIN component AS c ON c.mukey = mu.mukey  AND majcompflag = 'Yes'
 		INNER JOIN chorizon AS ch ON ch.cokey=c.cokey AND hzname NOT LIKE '%O%' AND hzname NOT LIKE '%r%'
-		AND hzdepb_r >0 AND hzdept_r <150
+		AND hzdepb_r >0 AND hzdept_r <156
 		INNER JOIN chtexturegrp AS cht ON ch.chkey=cht.chkey AND
 		CASE WHEN texture LIKE '%PM%' THEN 2
 	WHEN  texture LIKE '%DOM' THEN 2
