@@ -11,24 +11,30 @@
         DROP TABLE IF EXISTS temp_main;
         
 		CREATE TABLE  kitchensink AS 
-		SELECT areasymbol, musym, muname, mukey
+		SELECT areasymbol, musym, muname, mukey, 
+			(SELECT SUM (cco.comppct_r)
+			FROM mapunit AS mm2
+			INNER JOIN component AS cco ON cco.mukey = mm2.mukey AND muks .mukey = mm2.mukey AND majcompflag = 'Yes' ) AS  major_mu_pct_sum
         FROM legend  AS lks
-        INNER JOIN  mapunit AS muks ON muks.lkey = lks.lkey 
+        INNER JOIN  mapunit AS muks ON muks.lkey = lks.lkey  AND muks.mukey = 115628
 		;
 		
+	
 		CREATE TABLE comp_temp AS
 		SELECT mu1.mukey, cokey, comppct_r,
-        SUM (comppct_r) over(partition by mu1.mukey ) AS SUM_COMP_PCT
+		
+        SUM (comppct_r) over(partition by mu1.mukey ) AS SUM_COMP_PCT,  major_mu_pct_sum
    		FROM kitchensink AS mu1
-        INNER JOIN  component AS c1 ON c1.mukey = mu1.mukey AND majcompflag = 'Yes';
+        INNER JOIN  component AS c1 ON c1.mukey = mu1.mukey AND majcompflag = 'Yes' AND compkind != 'Miscellaneous area'
+		;
+		
+	
 		
 	CREATE TABLE comp_temp3 AS
-		SELECT cokey, SUM_COMP_PCT, CASE WHEN comppct_r = SUM_COMP_PCT THEN 1
+		SELECT cokey, SUM_COMP_PCT,  major_mu_pct_sum, CASE WHEN comppct_r = SUM_COMP_PCT THEN 1
         ELSE CAST (CAST (comppct_r AS  REAL) / CAST (SUM_COMP_PCT AS REAL) AS REAL) END AS WEIGHTED_COMP_PCT
 		FROM comp_temp;
 		
-	
-	
 	
 	CREATE TABLE temp_main AS
 		SELECT 
@@ -42,7 +48,7 @@
 		FROM kitchensink AS mu
 		INNER JOIN component AS c ON c.mukey = mu.mukey  AND majcompflag = 'Yes'
 		INNER JOIN chorizon AS ch ON ch.cokey=c.cokey AND hzname NOT LIKE '%O%' AND hzname NOT LIKE '%r%'
-		AND hzdepb_r >0 AND hzdept_r <156
+		AND hzdepb_r >42 AND hzdept_r <156
 		INNER JOIN chtexturegrp AS cht ON ch.chkey=cht.chkey AND
 		CASE WHEN texture LIKE '%PM%' THEN 2
 	WHEN  texture LIKE '%DOM' THEN 2
@@ -54,6 +60,7 @@
 	ELSE 1 END = 1
 	AND cht.rvindicator = 'Yes' AND  ch.hzdept_r IS NOT NULL 
 	ORDER BY  areasymbol, musym, muname, mu.mukey, comppct_r DESC, cokey,  hzdept_r, hzdepb_r;
+	
 
 		CREATE TABLE comp_temp2 AS
        SELECT temp_main.areasymbol , temp_main.musym, temp_main.muname, temp_main.MUKEY, 
